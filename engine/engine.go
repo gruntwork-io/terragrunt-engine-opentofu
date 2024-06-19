@@ -8,35 +8,43 @@ import (
 	"os"
 	"os/exec"
 	"sync"
+
+	"github.com/gruntwork-io/terragrunt-engine-go/engine"
+	"github.com/hashicorp/go-plugin"
+	"github.com/kr/pty"
+	log "github.com/sirupsen/logrus"
+	"golang.org/x/text/encoding/unicode"
+	"golang.org/x/text/transform"
+	"google.golang.org/grpc"
 )
 
 type TofuCommandExecutor struct {
-	pb.UnimplementedCommandExecutorServer
+	engine.UnimplementedCommandExecutorServer
 }
 
-func (c *TofuCommandExecutor) Init(req *pb.InitRequest, stream pb.CommandExecutor_InitServer) error {
-	log.Infof("Init Tofu plugin")
-	err := stream.Send(&pb.InitResponse{Stdout: "Tofu Initialization started", Stderr: "", ResultCode: 0})
+func (c *TofuCommandExecutor) Init(req *engine.InitRequest, stream engine.CommandExecutor_InitServer) error {
+	log.Info("Init Tofu plugin")
+	err := stream.Send(&engine.InitResponse{Stdout: "Tofu Initialization started", Stderr: "", ResultCode: 0})
 	if err != nil {
 		return err
 	}
 
 	// Stream some metadata as stdout for demonstration
-	for key, value := range req.Metadata {
-		err := stream.Send(&pb.InitResponse{Stdout: fmt.Sprintf("Tofu Metadata: %s = %s", key, value), Stderr: "", ResultCode: 0})
+	for key, value := range req.Meta {
+		err := stream.Send(&engine.InitResponse{Stdout: fmt.Sprintf("Tofu Metadata: %s = %s", key, value), Stderr: "", ResultCode: 0})
 		if err != nil {
 			return err
 		}
 	}
 
-	err = stream.Send(&pb.InitResponse{Stdout: "Tofu Initialization completed", Stderr: "", ResultCode: 0})
+	err = stream.Send(&engine.InitResponse{Stdout: "Tofu Initialization completed", Stderr: "", ResultCode: 0})
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func (c *TofuCommandExecutor) Run(req *pb.RunRequest, stream pb.CommandExecutor_RunServer) error {
+func (c *TofuCommandExecutor) Run(req *engine.RunRequest, stream engine.CommandExecutor_RunServer) error {
 	cmd := exec.Command(req.Command, req.Args...)
 	cmd.Dir = req.WorkingDir
 
@@ -98,7 +106,7 @@ func (c *TofuCommandExecutor) Run(req *pb.RunRequest, stream pb.CommandExecutor_
 				}
 				break
 			}
-			err = stream.Send(&pb.RunResponse{
+			err = stream.Send(&engine.RunResponse{
 				Stdout: string(char),
 			})
 			if err != nil {
@@ -121,7 +129,7 @@ func (c *TofuCommandExecutor) Run(req *pb.RunRequest, stream pb.CommandExecutor_
 				}
 				break
 			}
-			err = stream.Send(&pb.RunResponse{
+			err = stream.Send(&engine.RunResponse{
 				Stderr: string(char),
 			})
 			if err != nil {
@@ -142,7 +150,7 @@ func (c *TofuCommandExecutor) Run(req *pb.RunRequest, stream pb.CommandExecutor_
 		}
 	}
 
-	err = stream.Send(&pb.RunResponse{
+	err = stream.Send(&engine.RunResponse{
 		ResultCode: int32(resultCode),
 	})
 	if err != nil {
@@ -154,11 +162,11 @@ func (c *TofuCommandExecutor) Run(req *pb.RunRequest, stream pb.CommandExecutor_
 
 // GRPCServer is used to register the TofuCommandExecutor with the gRPC server
 func (c *TofuCommandExecutor) GRPCServer(broker *plugin.GRPCBroker, s *grpc.Server) error {
-	pb.RegisterCommandExecutorServer(s, c)
+	engine.RegisterCommandExecutorServer(s, c)
 	return nil
 }
 
 // GRPCClient is used to create a client that connects to the TofuCommandExecutor
 func (c *TofuCommandExecutor) GRPCClient(ctx context.Context, broker *plugin.GRPCBroker, client *grpc.ClientConn) (interface{}, error) {
-	return pb.NewCommandExecutorClient(client), nil
+	return engine.NewCommandExecutorClient(client), nil
 }
