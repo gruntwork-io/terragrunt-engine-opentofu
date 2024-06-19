@@ -5,7 +5,7 @@ default: build
 
 build: $(shell find . \( -type f -name '*.go' -print \))
 	set -xe ;\
-	go build -o engine -ldflags "-extldflags '-static'" .
+	go build -o terragrunt-engine -ldflags "-extldflags '-static'" .
 
 clean:
 	rm -f engine
