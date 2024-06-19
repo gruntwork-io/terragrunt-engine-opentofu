@@ -3,6 +3,4 @@ repos:
     rev:  v0.1.10
     hooks:
       - id: terraform-fmt
-        exclude: ^engine/
       - id: goimports
-        exclude: ^engine/
