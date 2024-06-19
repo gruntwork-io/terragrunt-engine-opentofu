@@ -23,5 +23,7 @@ fmt:
 	@echo "Running source files through gofmt..."
 	gofmt -w $(GOFMT_FILES)
 
+pre-commit:
+	pre-commit run --all-files
 
-.PHONY: default lint protoc test tools
+.PHONY: tools pre-commit lint protoc test default

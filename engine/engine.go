@@ -18,6 +18,10 @@ import (
 	"google.golang.org/grpc"
 )
 
+const (
+	wgSize = 2
+)
+
 type TofuCommandExecutor struct {
 	engine.UnimplementedCommandExecutorServer
 }
@@ -91,7 +95,7 @@ func (c *TofuCommandExecutor) Run(req *engine.RunRequest, stream engine.CommandE
 	var wg sync.WaitGroup
 
 	// 2 streams to send stdout and stderr
-	wg.Add(2)
+	wg.Add(wgSize)
 
 	// Stream stdout
 	go func() {
