@@ -2,6 +2,8 @@ module github.com/gruntwork-io/terragrunt-engine-opentofu
 
 go 1.21.8
 
+toolchain go1.22.2
+
 require (
 	github.com/gruntwork-io/terragrunt-engine-go v0.0.0-20240619144039-1fb4a29e1dc3
 	github.com/hashicorp/go-plugin v1.6.1
