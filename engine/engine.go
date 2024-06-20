@@ -164,6 +164,12 @@ func (c *TofuCommandExecutor) Run(req *engine.RunRequest, stream engine.CommandE
 	return nil
 }
 
+func (c *TofuCommandExecutor) Shutdown(req *engine.ShutdownRequest, stream engine.CommandExecutor_ShutdownServer) error {
+	log.Info("Shutdown Tofu plugin")
+
+	return nil
+}
+
 // GRPCServer is used to register the TofuCommandExecutor with the gRPC server
 func (c *TofuCommandExecutor) GRPCServer(broker *plugin.GRPCBroker, s *grpc.Server) error {
 	engine.RegisterCommandExecutorServer(s, c)
