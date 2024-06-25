@@ -28,20 +28,20 @@ type TofuCommandExecutor struct {
 
 func (c *TofuCommandExecutor) Init(req *engine.InitRequest, stream engine.CommandExecutor_InitServer) error {
 	log.Info("Init Tofu plugin")
-	err := stream.Send(&engine.InitResponse{Stdout: "Tofu Initialization started", Stderr: "", ResultCode: 0})
+	err := stream.Send(&engine.InitResponse{Stdout: "Tofu Initialization started\n", Stderr: "", ResultCode: 0})
 	if err != nil {
 		return err
 	}
 
 	// Stream some metadata as stdout for demonstration
 	for key, value := range req.Meta {
-		err := stream.Send(&engine.InitResponse{Stdout: fmt.Sprintf("Tofu Metadata: %s = %s", key, value), Stderr: "", ResultCode: 0})
+		err := stream.Send(&engine.InitResponse{Stdout: fmt.Sprintf("\nTofu Metadata: %s = %s\n", key, value), Stderr: "", ResultCode: 0})
 		if err != nil {
 			return err
 		}
 	}
 
-	err = stream.Send(&engine.InitResponse{Stdout: "Tofu Initialization completed", Stderr: "", ResultCode: 0})
+	err = stream.Send(&engine.InitResponse{Stdout: "\nTofu Initialization completed\n", Stderr: "", ResultCode: 0})
 	if err != nil {
 		return err
 	}
@@ -49,6 +49,7 @@ func (c *TofuCommandExecutor) Init(req *engine.InitRequest, stream engine.Comman
 }
 
 func (c *TofuCommandExecutor) Run(req *engine.RunRequest, stream engine.CommandExecutor_RunServer) error {
+	log.Info("Run Tofu plugin")
 	cmd := exec.Command(req.Command, req.Args...)
 	cmd.Dir = req.WorkingDir
 
