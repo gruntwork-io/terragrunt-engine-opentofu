@@ -19,7 +19,8 @@ import (
 )
 
 const (
-	wgSize = 2
+	wgSize      = 2
+	TofuCommand = "tofu"
 )
 
 type TofuEngine struct {
@@ -42,7 +43,7 @@ func (c *TofuEngine) Init(req *tgengine.InitRequest, stream tgengine.Engine_Init
 
 func (c *TofuEngine) Run(req *tgengine.RunRequest, stream tgengine.Engine_RunServer) error {
 	log.Infof("Run Tofu plugin %v", req.WorkingDir)
-	cmd := exec.Command(req.Command, req.Args...)
+	cmd := exec.Command(TofuCommand, req.Args...)
 	cmd.Dir = req.WorkingDir
 	env := make([]string, 0, len(req.EnvVars))
 	for key, value := range req.EnvVars {

@@ -129,8 +129,8 @@ func TestTofuEngine_Run(t *testing.T) {
 	engine := &TofuEngine{}
 	mockStream := &MockRunServer{}
 
-	cmd := "echo"
-	args := []string{"Hello, World!"}
+	cmd := "tofu"
+	args := []string{"--help"}
 	req := &tgengine.RunRequest{
 		Command: cmd,
 		Args:    args,
@@ -146,7 +146,7 @@ func TestTofuEngine_Run(t *testing.T) {
 			output += response.Stdout
 		}
 	}
-	assert.Contains(t, output, "Hello, World!")
+	assert.Contains(t, output, "Usage: tofu [global options] <subcommand> [args]")
 }
 
 func TestTofuEngine_Shutdown(t *testing.T) {
