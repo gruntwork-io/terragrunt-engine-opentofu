@@ -5,7 +5,7 @@ go 1.21.8
 toolchain go1.22.2
 
 require (
-	github.com/gruntwork-io/terragrunt-engine-go v0.0.0-20240626083632-72b374dde72f
+	github.com/gruntwork-io/terragrunt-engine-go v0.0.0-20240626195458-6d4e2c27f356
 	github.com/hashicorp/go-plugin v1.6.1
 	github.com/kr/pty v1.1.8
 	github.com/sirupsen/logrus v1.9.3
