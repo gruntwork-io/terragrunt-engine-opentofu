@@ -33,15 +33,7 @@ func (c *TofuCommandExecutor) Init(req *engine.InitRequest, stream engine.Comman
 		return err
 	}
 
-	// Stream some metadata as stdout for demonstration
-	for key, value := range req.Meta {
-		err := stream.Send(&engine.InitResponse{Stdout: fmt.Sprintf("\nTofu Metadata: %s = %s\n", key, value), Stderr: "", ResultCode: 0})
-		if err != nil {
-			return err
-		}
-	}
-
-	err = stream.Send(&engine.InitResponse{Stdout: "\nTofu Initialization completed\n", Stderr: "", ResultCode: 0})
+	err = stream.Send(&engine.InitResponse{Stdout: "Tofu Initialization completed\n", Stderr: "", ResultCode: 0})
 	if err != nil {
 		return err
 	}
@@ -49,10 +41,9 @@ func (c *TofuCommandExecutor) Init(req *engine.InitRequest, stream engine.Comman
 }
 
 func (c *TofuCommandExecutor) Run(req *engine.RunRequest, stream engine.CommandExecutor_RunServer) error {
-	log.Info("Run Tofu plugin")
+	log.Infof("Run Tofu plugin %v", req.WorkingDir)
 	cmd := exec.Command(req.Command, req.Args...)
 	cmd.Dir = req.WorkingDir
-
 	env := make([]string, 0, len(req.EnvVars))
 	for key, value := range req.EnvVars {
 		env = append(env, fmt.Sprintf("%s=%s", key, value))
@@ -143,7 +134,6 @@ func (c *TofuCommandExecutor) Run(req *engine.RunRequest, stream engine.CommandE
 			}
 		}
 	}()
-
 	wg.Wait()
 	err = cmd.Wait()
 	resultCode := 0
@@ -161,13 +151,16 @@ func (c *TofuCommandExecutor) Run(req *engine.RunRequest, stream engine.CommandE
 	if err != nil {
 		return err
 	}
-
 	return nil
 }
 
 func (c *TofuCommandExecutor) Shutdown(req *engine.ShutdownRequest, stream engine.CommandExecutor_ShutdownServer) error {
 	log.Info("Shutdown Tofu plugin")
 
+	err := stream.Send(&engine.ShutdownResponse{Stdout: "Tofu Shutdown completed\n", Stderr: "", ResultCode: 0})
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
