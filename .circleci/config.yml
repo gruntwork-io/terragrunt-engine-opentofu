@@ -169,6 +169,16 @@ jobs:
             
             go mod tidy
             go test -v ./...
+
+  build:
+    resource_class: xlarge
+    <<: *defaults
+    steps:
+      - checkout
+      - run: build-go-binaries --app-name terragrunt-engine --dest-path bin --ld-flags "-X github.com/gruntwork-io/go-commons/version.Version=$CIRCLE_TAG -extldflags '-static'"
+      - persist_to_workspace:
+          root: .
+          paths: [bin]
 #----------------------------------------------------------------------------------------------------------------------
 # WORKFLOWS
 #----------------------------------------------------------------------------------------------------------------------
@@ -215,3 +225,11 @@ workflows:
             - GITHUB__PAT__gruntwork-ci
           requires:
             - precommit
+      - build:
+          filters:
+            tags:
+              only: /^v.*/
+          context:
+            - AWS__PHXDEVOPS__circle-ci-test
+            - GCP__automated-tests
+            - GITHUB__PAT__gruntwork-ci
