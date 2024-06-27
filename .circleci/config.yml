@@ -62,7 +62,7 @@ jobs:
             set -x
             ls ~
             ls ~/.ssh
-            export GIT_SSH_COMMAND='ssh -v -i /home/circleci/.ssh/id_rsa_78a64a8391239adcd479c9be8b1903c7'
+            export GIT_SSH_COMMAND='ssh -v -i /home/circleci/.ssh/id_rsa_78a64a8391239adcd479c9be8b1903c7 -o IdentitiesOnly=yes'
             git config --global url."git@github.com:".insteadOf "https://github.com/"
             git config --global --get-regexp url
             git ls-remote git@github.com:gruntwork-io/terragrunt-engine-go
