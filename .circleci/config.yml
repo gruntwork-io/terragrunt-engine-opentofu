@@ -58,7 +58,7 @@ jobs:
           command: |
             ls ~
             ls ~/.ssh
-            git config --global url."https://${GITHUB_OAUTH_TOKEN}:x-oauth-basic@github.com/".insteadOf "https://github.com/"
+            git config --global url.ssh://git@github.com/.insteadOf https://github.com/
             git config --global --get-regexp url
             git ls-remote https://github.com/gruntwork-io/terragrunt-engine-go
       - run:
