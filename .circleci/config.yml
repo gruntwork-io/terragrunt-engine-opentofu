@@ -161,6 +161,10 @@ jobs:
           shell: powershell.exe
           command: |
             # to save time, we're running the tests in one go
+            $env:GIT_SSH_COMMAND="ssh -i /home/circleci/.ssh/id_rsa_78a64a8391239adcd479c9be8b1903c7 -o IdentitiesOnly=yes"
+            echo $env:GIT_SSH_COMMAND
+            
+            go mod tidy
             go test -v ./...
 #----------------------------------------------------------------------------------------------------------------------
 # WORKFLOWS
