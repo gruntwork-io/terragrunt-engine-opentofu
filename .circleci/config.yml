@@ -67,23 +67,14 @@ jobs:
             git config --global --get-regexp url
             git ls-remote git@github.com:gruntwork-io/terragrunt-engine-go
       - run:
-          name: Set Go environment variables
-          command: |
-            echo 'export GOPRIVATE=github.com/gruntwork-io/*' >> $BASH_ENV
-            echo 'export GONOSUMDB=github.com/gruntwork-io/*' >> $BASH_ENV
-            echo 'export GOPROXY=https://proxy.golang.org,direct' >> $BASH_ENV
-            source $BASH_ENV
-      - run:
           name: Install tools
           command: |
             make tools
       - run:
           name: Tidy check
           command: |
-            echo 'export GOPRIVATE=github.com/gruntwork-io/*' >> $BASH_ENV
-            echo 'export GONOSUMDB=github.com/gruntwork-io/*' >> $BASH_ENV
-            echo 'export GOPROXY=https://proxy.golang.org,direct' >> $BASH_ENV
-            source $BASH_ENV
+            export GOPRIVATE=github.com/gruntwork-io/*
+            export GIT_SSH_COMMAND='ssh -v -i /home/circleci/.ssh/id_rsa_78a64a8391239adcd479c9be8b1903c7 -o IdentitiesOnly=yes'
             go mod tidy
       - run:
           name: Run lint
