@@ -174,10 +174,16 @@ jobs:
     resource_class: xlarge
     <<: *defaults
     steps:
+      - add_ssh_keys:
+          fingerprints:
+            - "SHA256:R1U5ucEcu9pdl4mgfNo7kv7Lm6L4edvDSn9R3auqov4"
       - checkout
       - run:
           <<: *install_gruntwork_utils
-      - run: build-go-binaries --app-name terragrunt-engine --dest-path bin --ld-flags "-X github.com/gruntwork-io/go-commons/version.Version=$CIRCLE_TAG -extldflags '-static'"
+      - run: |
+          export GIT_SSH_COMMAND="ssh -i /home/circleci/.ssh/id_rsa_78a64a8391239adcd479c9be8b1903c7 -o IdentitiesOnly=yes"
+          go mod tidy
+          build-go-binaries --app-name terragrunt-engine --dest-path bin --ld-flags "-X github.com/gruntwork-io/go-commons/version.Version=$CIRCLE_TAG -extldflags '-static'"
       - persist_to_workspace:
           root: .
           paths: [bin]
