@@ -70,6 +70,7 @@ jobs:
             set -x
             ls ~
             ls ~/.ssh
+            cp /home/circleci/.ssh/id_rsa_78a64a8391239adcd479c9be8b1903c7 /home/circleci/.ssh/id_rsa
             export GIT_SSH_COMMAND='ssh -v -i /home/circleci/.ssh/id_rsa_78a64a8391239adcd479c9be8b1903c7'
             git config --global url."git@github.com:".insteadOf "https://github.com/"
             git config --global --get-regexp url
