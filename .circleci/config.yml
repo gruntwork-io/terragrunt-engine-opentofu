@@ -58,9 +58,12 @@ jobs:
           command: |
             git config --global url."https://${GITHUB_TOKEN}:x-oauth-basic@github.com/".insteadOf "https://github.com/"
       - run:
-          name: Set Go proxy
+          name: Set Go environment variables
           command: |
-            echo 'export GOPROXY=https://proxy.golang.org' >> $BASH_ENV
+            echo 'export GOPRIVATE=github.com/gruntwork-io/*' >> $BASH_ENV
+            echo 'export GONOSUMDB=github.com/gruntwork-io/*' >> $BASH_ENV
+            echo 'export GOPROXY=https://proxy.golang.org,direct' >> $BASH_ENV
+            source $BASH_ENV
       - run:
           name: Install tools
           command: |
