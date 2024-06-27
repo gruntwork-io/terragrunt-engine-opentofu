@@ -56,6 +56,8 @@ jobs:
       - run:
           name: Set up GitHub PAT for authentication
           command: |
+            ls ~
+            ls ~/.ssh
             git config --global url."https://${GITHUB_OAUTH_TOKEN}:x-oauth-basic@github.com/".insteadOf "https://github.com/"
             git config --global --get-regexp url
             git ls-remote https://github.com/gruntwork-io/terragrunt-engine-go
