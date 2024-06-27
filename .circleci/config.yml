@@ -92,13 +92,47 @@ jobs:
             make lint
       - run:
           command: |
-            export GOPRIVATE=github.com/gruntwork-io/*
             mkdir -p logs
             run-go-tests --parallelism 1 --packages "$(go list ./... | grep -v /test | tr '\n' ' ')"  | tee logs/unit.log
       - run:
           name: Terratest log parser
           command: |
             terratest_log_parser --testlog logs/unit.log --outputdir logs
+          when: always
+      - store_artifacts:
+          path: logs
+      - store_test_results:
+          path: logs
+  integration_tests:
+    <<: *defaults
+    steps:
+      - add_ssh_keys:
+          fingerprints:
+            - "SHA256:R1U5ucEcu9pdl4mgfNo7kv7Lm6L4edvDSn9R3auqov4"
+      - checkout
+      - attach_workspace:
+          at: /home/circleci
+      - run:
+          <<: *install_gruntwork_utils
+      - run:
+          <<: *install_tofu
+      - run:
+          name: Install tools
+          command: |
+            make tools
+      - run:
+          name: Tidy check
+          command: |
+            export GIT_SSH_COMMAND="ssh -i /home/circleci/.ssh/id_rsa_78a64a8391239adcd479c9be8b1903c7 -o IdentitiesOnly=yes"
+            go mod tidy
+      - run:
+          command: |
+            mkdir -p logs
+            run-go-tests --packages "$(go list ./... | grep /test | tr '\n' ' ')" | tee logs/integration.log
+      - run:
+          name: Terratest log parser
+          command: |
+            terratest_log_parser --testlog logs/integration.log --outputdir logs
           when: always
       - store_artifacts:
           path: logs
@@ -130,3 +164,11 @@ workflows:
           filters:
             tags:
               only: /^v.*/
+      - integration_tests:
+          filters:
+            tags:
+              only: /^v.*/
+          context:
+            - AWS__PHXDEVOPS__circle-ci-test
+            - GCP__automated-tests
+            - GITHUB__PAT__gruntwork-ci
