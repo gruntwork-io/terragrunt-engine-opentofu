@@ -1,5 +1,9 @@
 version: 2.1
 
+orbs:
+  win: circleci/windows@5.0
+  go: circleci/go@1.11
+
 env: &env
   environment:
     GO111MODULE: auto
