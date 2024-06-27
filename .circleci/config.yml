@@ -138,6 +138,26 @@ jobs:
           path: logs
       - store_test_results:
           path: logs
+  test_windows:
+    executor:
+      name: win/default
+      size: "large"
+    steps:
+      - checkout
+      - run:
+          name: Install golang
+          shell: powershell.exe
+          command: ./_ci/install-golang.ps1
+      - run:
+          name: Install Opentofu
+          shell: powershell.exe
+          command: ./_ci/install-opentofu.ps1
+      - run:
+          name: Run go terraform tests
+          shell: powershell.exe
+          command: |
+            # to save time, we're running the tests in one go
+            go test -v ./...
 #----------------------------------------------------------------------------------------------------------------------
 # WORKFLOWS
 #----------------------------------------------------------------------------------------------------------------------
@@ -165,6 +185,14 @@ workflows:
             tags:
               only: /^v.*/
       - integration_tests:
+          filters:
+            tags:
+              only: /^v.*/
+          context:
+            - AWS__PHXDEVOPS__circle-ci-test
+            - GCP__automated-tests
+            - GITHUB__PAT__gruntwork-ci
+      - test_windows:
           filters:
             tags:
               only: /^v.*/
