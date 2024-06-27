@@ -71,6 +71,10 @@ jobs:
       - run:
           name: Tidy check
           command: |
+            echo 'export GOPRIVATE=github.com/gruntwork-io/*' >> $BASH_ENV
+            echo 'export GONOSUMDB=github.com/gruntwork-io/*' >> $BASH_ENV
+            echo 'export GOPROXY=https://proxy.golang.org,direct' >> $BASH_ENV
+            source $BASH_ENV
             go mod tidy
       - run:
           name: Run lint
