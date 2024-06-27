@@ -54,6 +54,14 @@ jobs:
       - run:
           <<: *install_gruntwork_utils
       - run:
+          name: Set up GitHub PAT for authentication
+          command: |
+            git config --global url."https://${GITHUB_TOKEN}:x-oauth-basic@github.com/".insteadOf "https://github.com/"
+      - run:
+          name: Set Go proxy
+          command: |
+            echo 'export GOPROXY=https://proxy.golang.org' >> $BASH_ENV
+      - run:
           name: Install tools
           command: |
             make tools
