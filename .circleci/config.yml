@@ -1,3 +1,5 @@
+version: 2.1
+
 env: &env
   environment:
     GO111MODULE: auto
@@ -5,6 +7,9 @@ env: &env
     MODULE_CI_VERSION: v0.54.0
     TERRATEST_LOG_PARSER_VERSION: v0.37.0
     GOLANG_VERSION: 1.21.1
+    # Configuration to clone repo
+    GOPRIVATE: "github.com/gruntwork-io/*"
+    GIT_SSH_COMMAND: "ssh -i /home/circleci/.ssh/id_rsa_78a64a8391239adcd479c9be8b1903c7 -o IdentitiesOnly=yes"
 
 defaults: &defaults
   machine:
@@ -46,7 +51,14 @@ install_gruntwork_utils: &install_gruntwork_utils
       --terragrunt-version "NONE" \
       --packer-version "NONE" \
       --go-version ${GOLANG_VERSION}
-version: 2.1
+
+run_terratest_log_parser: &run_terratest_log_parser
+  name: Terratest log parser
+  command: |
+    gruntwork-install --binary-name 'terratest_log_parser' --repo 'https://github.com/gruntwork-io/terratest' --tag 'v0.30.0'
+    terratest_log_parser --testlog logs/integration.log --outputdir logs
+  when: always
+
 #----------------------------------------------------------------------------------------------------------------------
 # BUILD JOBS
 #----------------------------------------------------------------------------------------------------------------------
@@ -81,8 +93,6 @@ jobs:
       - run:
           name: Tidy check
           command: |
-            export GOPRIVATE=github.com/gruntwork-io/*
-            export GIT_SSH_COMMAND='ssh -i /home/circleci/.ssh/id_rsa_78a64a8391239adcd479c9be8b1903c7 -o IdentitiesOnly=yes'
             go mod tidy
       - run:
           name: Run lint
@@ -94,11 +104,7 @@ jobs:
             mkdir -p logs
             run-go-tests --parallelism 1 --packages "$(go list ./... | grep -v /test | tr '\n' ' ')"  | tee logs/unit.log
       - run:
-          name: Terratest log parser
-          command: |
-            gruntwork-install --binary-name 'terratest_log_parser' --repo 'https://github.com/gruntwork-io/terratest' --tag 'v0.30.0'
-            terratest_log_parser --testlog logs/tests.log --outputdir logs
-          when: always
+          <<: *run_terratest_log_parser
       - store_artifacts:
           path: logs
       - store_test_results:
