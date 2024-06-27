@@ -67,6 +67,7 @@ jobs:
             make lint
       - run:
           command: |
+            export GOPRIVATE=github.com/gruntwork-io/*
             mkdir -p logs
             go mod tidy
             run-go-tests --parallelism 1 --packages "$(go list ./... | grep -v /test | tr '\n' ' ')"  | tee logs/unit.log
