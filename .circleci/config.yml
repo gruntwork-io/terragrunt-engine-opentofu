@@ -44,20 +44,13 @@ install_gruntwork_utils: &install_gruntwork_utils
     gruntwork-install --module-name "gruntwork-module-circleci-helpers" --repo "https://github.com/gruntwork-io/terraform-aws-ci" --tag "${MODULE_CI_VERSION}"
     gruntwork-install --module-name "git-helpers" --repo "https://github.com/gruntwork-io/terraform-aws-ci" --tag "${MODULE_CI_VERSION}"
     gruntwork-install --binary-name "terratest_log_parser" --repo "https://github.com/gruntwork-io/terratest" --tag "${TERRATEST_LOG_PARSER_VERSION}"
+    gruntwork-install --binary-name 'terratest_log_parser' --repo 'https://github.com/gruntwork-io/terratest' --tag 'v0.30.0'
     configure-environment-for-gruntwork-module \
       --mise-version "NONE" \
       --terraform-version "NONE" \
       --terragrunt-version "NONE" \
       --packer-version "NONE" \
       --go-version ${GOLANG_VERSION}
-
-run_terratest_log_parser: &run_terratest_log_parser
-  name: Terratest log parser
-  command: |
-    gruntwork-install --binary-name 'terratest_log_parser' --repo 'https://github.com/gruntwork-io/terratest' --tag 'v0.30.0'
-    terratest_log_parser --testlog logs/integration.log --outputdir logs
-  when: always
-
 #----------------------------------------------------------------------------------------------------------------------
 # BUILD JOBS
 #----------------------------------------------------------------------------------------------------------------------
@@ -104,7 +97,10 @@ jobs:
             mkdir -p logs
             run-go-tests --parallelism 1 --packages "$(go list ./... | grep -v /test | tr '\n' ' ')"  | tee logs/unit.log
       - run:
-          <<: *run_terratest_log_parser
+          name: Terratest log parser
+          command: |
+            terratest_log_parser --testlog logs/unit.log --outputdir logs
+          when: always
       - store_artifacts:
           path: logs
       - store_test_results:
