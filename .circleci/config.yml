@@ -5,11 +5,13 @@ env: &env
     MODULE_CI_VERSION: v0.54.0
     TERRATEST_LOG_PARSER_VERSION: v0.37.0
     GOLANG_VERSION: 1.21.1
+
 defaults: &defaults
   machine:
     enabled: true
     image: ubuntu-2004:2022.10.1
   <<: *env
+
 run_precommit: &run_precommit
   # Fail the build if the pre-commit hooks don't pass. Note: if you run $ pre-commit install locally within this repo, these hooks will
   # execute automatically every time before you commit, ensuring the build never fails at this step!
@@ -17,6 +19,20 @@ run_precommit: &run_precommit
   command: |
     pre-commit install
     pre-commit run --all-files
+
+install_tofu: &install_tofu
+  name: Install OpenTofu
+  command: |
+    pushd .
+    cd /tmp
+    curl -L "https://github.com/opentofu/opentofu/releases/download/v1.7.0/tofu_1.7.0_linux_amd64.zip" -o tofu.zip
+    unzip -o tofu.zip
+    sudo install -m 0755 tofu /usr/local/bin/tofu
+    rm -rf tofu
+    rm -rf tofu.zip
+    popd
+    tofu --version
+
 install_gruntwork_utils: &install_gruntwork_utils
   name: install gruntwork utils
   command: |
@@ -57,15 +73,7 @@ jobs:
       - run:
           <<: *install_gruntwork_utils
       - run:
-          name: Set up GitHub PAT for authentication
-          command: |
-            set -x
-            ls ~
-            ls ~/.ssh
-            export GIT_SSH_COMMAND='ssh -v -i /home/circleci/.ssh/id_rsa_78a64a8391239adcd479c9be8b1903c7 -o IdentitiesOnly=yes'
-            git config --global url."git@github.com:".insteadOf "https://github.com/"
-            git config --global --get-regexp url
-            git ls-remote git@github.com:gruntwork-io/terragrunt-engine-go
+          <<: *install_tofu
       - run:
           name: Install tools
           command: |
@@ -74,7 +82,7 @@ jobs:
           name: Tidy check
           command: |
             export GOPRIVATE=github.com/gruntwork-io/*
-            export GIT_SSH_COMMAND='ssh -v -i /home/circleci/.ssh/id_rsa_78a64a8391239adcd479c9be8b1903c7 -o IdentitiesOnly=yes'
+            export GIT_SSH_COMMAND='ssh -i /home/circleci/.ssh/id_rsa_78a64a8391239adcd479c9be8b1903c7 -o IdentitiesOnly=yes'
             go mod tidy
       - run:
           name: Run lint
@@ -84,9 +92,7 @@ jobs:
           command: |
             export GOPRIVATE=github.com/gruntwork-io/*
             mkdir -p logs
-            go mod tidy
             run-go-tests --parallelism 1 --packages "$(go list ./... | grep -v /test | tr '\n' ' ')"  | tee logs/unit.log
-            go test -run=TestParseDependencyBlockMultiple -race ./config | tee -a logs/unit.log
       - run:
           name: Terratest log parser
           command: |
