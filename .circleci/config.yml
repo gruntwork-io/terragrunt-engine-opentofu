@@ -56,7 +56,7 @@ jobs:
       - run:
           name: Set up GitHub PAT for authentication
           command: |
-            git config --global url."https://${GITHUB_TOKEN}:x-oauth-basic@github.com/".insteadOf "https://github.com/"
+            git config --global url."https://${GITHUB_OAUTH_TOKEN}@github.com/".insteadOf "https://github.com/"
       - run:
           name: Set Go environment variables
           command: |
