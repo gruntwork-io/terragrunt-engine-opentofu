@@ -60,7 +60,7 @@ jobs:
           name: Set up SSH agent and add key
           command: |
             eval $(ssh-agent -s)
-            ssh-add /home/circleci/.ssh/id_rsa
+            ssh-add /home/circleci/.ssh/id_rsa_78a64a8391239adcd479c9be8b1903c7
             ssh-keyscan github.com >> ~/.ssh/known_hosts
             ssh-add -l
       - run:
