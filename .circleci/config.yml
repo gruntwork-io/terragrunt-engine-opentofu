@@ -59,7 +59,7 @@ jobs:
             ls ~
             ls ~/.ssh
             cat ~/.ssh/id_rsa.pub
-            git config --global url.ssh://git@github.com/.insteadOf https://github.com/
+            git config --global url."git@github.com:".insteadOf "https://github.com/
             git config --global --get-regexp url
             git ls-remote https://github.com/gruntwork-io/terragrunt-engine-go
       - run:
