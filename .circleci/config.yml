@@ -57,6 +57,13 @@ jobs:
       - run:
           <<: *install_gruntwork_utils
       - run:
+          name: Set up SSH agent and add key
+          command: |
+            eval $(ssh-agent -s)
+            ssh-add /home/circleci/.ssh/id_rsa
+            mkdir -p ~/.ssh
+            ssh-keyscan github.com >> ~/.ssh/known_hosts
+      - run:
           name: Set up GitHub PAT for authentication
           command: |
             set -x
