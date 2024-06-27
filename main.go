@@ -1,8 +1,9 @@
 package main
 
 import (
-	types "github.com/gruntwork-io/terragrunt-engine-go/types"
+	tgengine "github.com/gruntwork-io/terragrunt-engine-go/engine"
 	"github.com/gruntwork-io/terragrunt-engine-opentofu/engine"
+
 	"github.com/hashicorp/go-plugin"
 )
 
@@ -14,7 +15,7 @@ func main() {
 			MagicCookieValue: "terragrunt",
 		},
 		Plugins: map[string]plugin.Plugin{
-			"tofu": &types.TerragruntGRPCEngine{Impl: &engine.TofuCommandExecutor{}},
+			"tofu": &tgengine.TerragruntGRPCEngine{Impl: &engine.TofuEngine{}},
 		},
 		GRPCServer: plugin.DefaultGRPCServer,
 	})
