@@ -4,12 +4,13 @@ import (
 	"context"
 	"testing"
 
+	"os"
+	"os/exec"
+
 	tgengine "github.com/gruntwork-io/terragrunt-engine-go/proto"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"google.golang.org/grpc/metadata"
-	"os"
-	"os/exec"
 )
 
 // MockInitServer is a mock implementation of the InitServer interface

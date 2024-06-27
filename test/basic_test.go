@@ -3,17 +3,18 @@ package test
 import (
 	"context"
 	"fmt"
+	"net"
+	"os"
+	"strings"
+	"testing"
+	"time"
+
 	tgengine "github.com/gruntwork-io/terragrunt-engine-go/proto"
 	"github.com/gruntwork-io/terragrunt-engine-opentofu/engine"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/test/bufconn"
-	"net"
-	"os"
-	"strings"
-	"testing"
-	"time"
 )
 
 const bufSize = 1024 * 1024
@@ -35,7 +36,7 @@ func TestRun(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 
-	stdout, stderr, err := runTofuCommand(ctx, "tofu", []string{"init"}, "fixture-basic-project", map[string]string{})
+	stdout, stderr, err := runTofuCommand(t, ctx, "tofu", []string{"init"}, "fixture-basic-project", map[string]string{})
 	require.NoError(t, err)
 
 	require.NotEmpty(t, stdout)
@@ -47,11 +48,11 @@ func TestVarPassing(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 
-	stdout, stderr, err := runTofuCommand(ctx, "tofu", []string{"init"}, "fixture-variables", map[string]string{})
+	_, _, err := runTofuCommand(t, ctx, "tofu", []string{"init"}, "fixture-variables", map[string]string{})
 	require.NoError(t, err)
 
 	testValue := fmt.Sprintf("test_value_%v", time.Now().Unix())
-	stdout, stderr, err = runTofuCommand(ctx, "tofu", []string{"plan"}, "fixture-variables", map[string]string{"TF_VAR_test_var": testValue})
+	stdout, stderr, err := runTofuCommand(t, ctx, "tofu", []string{"plan"}, "fixture-variables", map[string]string{"TF_VAR_test_var": testValue})
 	require.NoError(t, err)
 
 	require.NotEmpty(t, stdout)
@@ -63,12 +64,16 @@ func bufDialer(context.Context, string) (net.Conn, error) {
 	return lis.Dial()
 }
 
-func runTofuCommand(ctx context.Context, command string, args []string, workingDir string, envVars map[string]string) (string, string, error) {
+func runTofuCommand(t *testing.T, ctx context.Context, command string, args []string, workingDir string, envVars map[string]string) (string, string, error) {
+	// nolint:staticcheck
 	conn, err := grpc.DialContext(ctx, "", grpc.WithContextDialer(bufDialer), grpc.WithInsecure())
 	if err != nil {
 		return "", "", err
 	}
-	defer conn.Close()
+	defer func() {
+		err := conn.Close()
+		require.NoError(t, err)
+	}()
 
 	client := tgengine.NewEngineClient(conn)
 	stream, err := client.Run(ctx, &tgengine.RunRequest{
