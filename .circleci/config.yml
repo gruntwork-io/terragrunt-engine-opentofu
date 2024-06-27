@@ -57,21 +57,12 @@ jobs:
       - run:
           <<: *install_gruntwork_utils
       - run:
-          name: Set up SSH agent and add key
-          command: |
-            cp  /home/circleci/.ssh/id_rsa_78a64a8391239adcd479c9be8b1903c7 /home/circleci/.ssh/id_rsa
-            eval $(ssh-agent -s)
-            ssh-add /home/circleci/.ssh/id_rsa_78a64a8391239adcd479c9be8b1903c7
-            ssh-keyscan github.com >> ~/.ssh/known_hosts
-            ssh-add -l
-      - run:
           name: Set up GitHub PAT for authentication
           command: |
             set -x
             ls ~
             ls ~/.ssh
-            cp /home/circleci/.ssh/id_rsa_78a64a8391239adcd479c9be8b1903c7 /home/circleci/.ssh/id_rsa
-            export GIT_SSH_COMMAND='ssh -v -i /home/circleci/.ssh/id_rsa_78a64a8391239adcd479c9be8b1903c7'
+            export GIT_SSH_COMMAND='ssh -v -i /home/circleci/.ssh/id_rsa'
             git config --global url."git@github.com:".insteadOf "https://github.com/"
             git config --global --get-regexp url
             git ls-remote git@github.com:gruntwork-io/terragrunt-engine-go
