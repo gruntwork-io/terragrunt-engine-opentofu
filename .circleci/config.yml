@@ -175,6 +175,8 @@ jobs:
     <<: *defaults
     steps:
       - checkout
+      - run:
+          <<: *install_gruntwork_utils
       - run: build-go-binaries --app-name terragrunt-engine --dest-path bin --ld-flags "-X github.com/gruntwork-io/go-commons/version.Version=$CIRCLE_TAG -extldflags '-static'"
       - persist_to_workspace:
           root: .
