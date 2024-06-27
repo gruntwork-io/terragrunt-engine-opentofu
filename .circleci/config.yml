@@ -151,11 +151,11 @@ jobs:
       - run:
           name: Install golang
           shell: powershell.exe
-          command: ./_ci/install-golang.ps1
+          command: ./.circleci/install-golang.ps1
       - run:
           name: Install Opentofu
           shell: powershell.exe
-          command: ./_ci/install-opentofu.ps1
+          command: ./.circleci/install-opentofu.ps1
       - run:
           name: Run go terraform tests
           shell: powershell.exe
