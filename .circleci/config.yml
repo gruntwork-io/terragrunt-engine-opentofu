@@ -196,6 +196,8 @@ workflows:
             - AWS__PHXDEVOPS__circle-ci-test
             - GCP__automated-tests
             - GITHUB__PAT__gruntwork-ci
+          requires:
+            - precommit
       - test_windows:
           filters:
             tags:
@@ -204,3 +206,5 @@ workflows:
             - AWS__PHXDEVOPS__circle-ci-test
             - GCP__automated-tests
             - GITHUB__PAT__gruntwork-ci
+          requires:
+            - precommit
