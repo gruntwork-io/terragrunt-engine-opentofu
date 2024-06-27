@@ -9,7 +9,6 @@ env: &env
     GOLANG_VERSION: 1.21.1
     # Configuration to clone repo
     GOPRIVATE: "github.com/gruntwork-io/*"
-    GIT_SSH_COMMAND: "ssh -i /home/circleci/.ssh/id_rsa_78a64a8391239adcd479c9be8b1903c7 -o IdentitiesOnly=yes"
 
 defaults: &defaults
   machine:
@@ -93,6 +92,7 @@ jobs:
       - run:
           name: Tidy check
           command: |
+            export GIT_SSH_COMMAND="ssh -i /home/circleci/.ssh/id_rsa_78a64a8391239adcd479c9be8b1903c7 -o IdentitiesOnly=yes"
             go mod tidy
       - run:
           name: Run lint
