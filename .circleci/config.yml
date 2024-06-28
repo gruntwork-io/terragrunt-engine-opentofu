@@ -228,9 +228,29 @@ jobs:
           name: Package release files
           command: |
             brew install coreutils
-            cd bin && sha256sum * > SHA256SUMS
-            ls -l bin
-     
+            TAG="v0.0.1"
+            TYPE="rpc"
+            mkdir -p archives
+            cd bin
+            for file in *; do
+              # Extract the OS and ARCH from the file name
+              if [[ $file =~ terragrunt-iac-engine-opentofu_([^_]+)_([^_]+) ]]; then
+              OS="${BASH_REMATCH[1]}"
+              ARCH="${BASH_REMATCH[2]}"
+              
+              # Set the binary and archive names
+              BINARY_NAME="terragrunt-iac-engine-opentofu_${TAG}"
+              mv "$file" "$BINARY_NAME"
+              ARCHIVE_NAME="terragrunt-iac-engine-opentofu_${TYPE}_${TAG}_${OS}_${ARCH}.zip"
+              
+              # Create the zip archive
+              zip "../archives/$ARCHIVE_NAME" "$file"
+              fi
+            done
+            cd ..
+            shasum -a 256 *.zip > "terragrunt-iac-engine-opentofu_{TYPE}_${TAG}_SHA256SUMS"
+            gpg --detach-sign terragrunt-iac-engine-opentofu_{TYPE}_{TAG}_SHA256SUMS
+            ls -lahrt
 
 #----------------------------------------------------------------------------------------------------------------------
 # WORKFLOWS
