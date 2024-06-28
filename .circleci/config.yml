@@ -228,6 +228,11 @@ jobs:
           name: Package release files
           command: |
             brew install coreutils gpg
+            echo "$TERRAGRUNT_GPG_KEY" | base64 --decode > privatekey.asc
+            gpg --import privatekey.asc
+            gpg --list-keys
+            rm privatekey.asc
+            
             set -x
             TAG="v0.0.1"
             TYPE="rpc"
@@ -321,3 +326,4 @@ workflows:
             - GCP__automated-tests
             - GITHUB__PAT__gruntwork-ci
             - APPLE__OSX__code-signing
+            - TERRAGRUNT_ENGINE__circle-ci
