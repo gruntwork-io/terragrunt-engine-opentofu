@@ -233,7 +233,7 @@ jobs:
             gpg --batch --import privatekey.asc
             gpg --list-keys
             KEY_ID=$(gpg --list-keys --with-colons | awk -F: '/^pub/{print $5}')
-            echo -e "5\ny\n" | gpg --command-fd 0 --expert --edit-key $KEY_ID trust
+            echo -e "trust\n5\ny\n" | gpg --command-fd 0 --edit-key $KEY_ID trust
             mkdir -p ~/.gnupg
             echo "default-key $KEY_ID" >> ~/.gnupg/gpg.conf
             gpg --list-keys
