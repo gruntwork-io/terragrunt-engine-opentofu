@@ -227,7 +227,7 @@ jobs:
       - run:
           name: Package release files
           command: |
-            brew install coreutils
+            brew install coreutils gpg
             set -x
             TAG="v0.0.1"
             TYPE="rpc"
