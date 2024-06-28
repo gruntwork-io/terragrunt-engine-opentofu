@@ -5,7 +5,8 @@ default: build
 
 build: $(shell find . \( -type f -name '*.go' -print \))
 	set -xe ;\
-	go build -o terragrunt-engine -ldflags "-extldflags '-static'" .
+	vtag=$$(git describe --tags --abbrev=12 --dirty --broken) ;\
+	go build -o terragrunt-iac-engine-opentofu -ldflags "-X github.com/gruntwork-io/go-commons/version.Version=$${vtag} -extldflags '-static'" .
 
 clean:
 	rm -f engine
