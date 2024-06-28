@@ -1,7 +1,7 @@
 # See https://github.com/gruntwork-io/terraform-aws-ci/blob/main/modules/sign-binary-helpers/
 # for further instructions on how to sign the binary + submitting for notarization.
 
-source = ["./bin/terragrunt-iac-engine-opentofu"]
+source = ["./bin/terragrunt-iac-engine-opentofu_darwin_arm64"]
 
 bundle_id = "io.gruntwork.app.terragrunt"
 
