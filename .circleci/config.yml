@@ -1,3 +1,9 @@
+version: 2.1
+
+orbs:
+  win: circleci/windows@5.0
+  go: circleci/go@1.11
+
 env: &env
   environment:
     GO111MODULE: auto
@@ -5,11 +11,15 @@ env: &env
     MODULE_CI_VERSION: v0.54.0
     TERRATEST_LOG_PARSER_VERSION: v0.37.0
     GOLANG_VERSION: 1.21.1
+    # Configuration to clone repo
+    GOPRIVATE: "github.com/gruntwork-io/*"
+
 defaults: &defaults
   machine:
     enabled: true
     image: ubuntu-2004:2022.10.1
   <<: *env
+
 run_precommit: &run_precommit
   # Fail the build if the pre-commit hooks don't pass. Note: if you run $ pre-commit install locally within this repo, these hooks will
   # execute automatically every time before you commit, ensuring the build never fails at this step!
@@ -17,6 +27,20 @@ run_precommit: &run_precommit
   command: |
     pre-commit install
     pre-commit run --all-files
+
+install_tofu: &install_tofu
+  name: Install OpenTofu
+  command: |
+    pushd .
+    cd /tmp
+    curl -L "https://github.com/opentofu/opentofu/releases/download/v1.7.0/tofu_1.7.0_linux_amd64.zip" -o tofu.zip
+    unzip -o tofu.zip
+    sudo install -m 0755 tofu /usr/local/bin/tofu
+    rm -rf tofu
+    rm -rf tofu.zip
+    popd
+    tofu --version
+
 install_gruntwork_utils: &install_gruntwork_utils
   name: install gruntwork utils
   command: |
@@ -30,7 +54,6 @@ install_gruntwork_utils: &install_gruntwork_utils
       --terragrunt-version "NONE" \
       --packer-version "NONE" \
       --go-version ${GOLANG_VERSION}
-version: 2.1
 #----------------------------------------------------------------------------------------------------------------------
 # BUILD JOBS
 #----------------------------------------------------------------------------------------------------------------------
@@ -48,11 +71,16 @@ jobs:
   tests:
     <<: *defaults
     steps:
+      - add_ssh_keys:
+          fingerprints:
+            - "SHA256:R1U5ucEcu9pdl4mgfNo7kv7Lm6L4edvDSn9R3auqov4"
       - checkout
       - attach_workspace:
           at: /home/circleci
       - run:
           <<: *install_gruntwork_utils
+      - run:
+          <<: *install_tofu
       - run:
           name: Install tools
           command: |
@@ -60,6 +88,7 @@ jobs:
       - run:
           name: Tidy check
           command: |
+            export GIT_SSH_COMMAND="ssh -i /home/circleci/.ssh/id_rsa_78a64a8391239adcd479c9be8b1903c7 -o IdentitiesOnly=yes"
             go mod tidy
       - run:
           name: Run lint
@@ -68,19 +97,98 @@ jobs:
       - run:
           command: |
             mkdir -p logs
-            go mod tidy
             run-go-tests --parallelism 1 --packages "$(go list ./... | grep -v /test | tr '\n' ' ')"  | tee logs/unit.log
-            go test -run=TestParseDependencyBlockMultiple -race ./config | tee -a logs/unit.log
       - run:
           name: Terratest log parser
           command: |
-            gruntwork-install --binary-name 'terratest_log_parser' --repo 'https://github.com/gruntwork-io/terratest' --tag 'v0.30.0'
-            terratest_log_parser --testlog logs/tests.log --outputdir logs
+            terratest_log_parser --testlog logs/unit.log --outputdir logs
           when: always
       - store_artifacts:
           path: logs
       - store_test_results:
           path: logs
+  integration_tests:
+    <<: *defaults
+    steps:
+      - add_ssh_keys:
+          fingerprints:
+            - "SHA256:R1U5ucEcu9pdl4mgfNo7kv7Lm6L4edvDSn9R3auqov4"
+      - checkout
+      - attach_workspace:
+          at: /home/circleci
+      - run:
+          <<: *install_gruntwork_utils
+      - run:
+          <<: *install_tofu
+      - run:
+          name: Install tools
+          command: |
+            make tools
+      - run:
+          name: Tidy check
+          command: |
+            export GIT_SSH_COMMAND="ssh -i /home/circleci/.ssh/id_rsa_78a64a8391239adcd479c9be8b1903c7 -o IdentitiesOnly=yes"
+            go mod tidy
+      - run:
+          command: |
+            mkdir -p logs
+            run-go-tests --packages "$(go list ./... | grep /test | tr '\n' ' ')" | tee logs/integration.log
+      - run:
+          name: Terratest log parser
+          command: |
+            terratest_log_parser --testlog logs/integration.log --outputdir logs
+          when: always
+      - store_artifacts:
+          path: logs
+      - store_test_results:
+          path: logs
+  test_windows:
+    executor:
+      name: win/default
+      size: "large"
+    steps:
+      - add_ssh_keys:
+          fingerprints:
+            - "SHA256:R1U5ucEcu9pdl4mgfNo7kv7Lm6L4edvDSn9R3auqov4"
+      - checkout
+      - run:
+          name: Install golang
+          shell: powershell.exe
+          command: ./.circleci/install-golang.ps1
+      - run:
+          name: Install Opentofu
+          shell: powershell.exe
+          command: ./.circleci/install-opentofu.ps1
+      - run:
+          name: Run go terraform tests
+          shell: powershell.exe
+          command: |
+            # to save time, we're running the tests in one go
+            $env:GIT_SSH_COMMAND="ssh -i /home/circleci/.ssh/id_rsa_78a64a8391239adcd479c9be8b1903c7 -o IdentitiesOnly=yes"
+            echo $env:GIT_SSH_COMMAND
+            
+            go mod tidy
+            go test -v ./...
+
+  build:
+    resource_class: xlarge
+    <<: *defaults
+    steps:
+      - add_ssh_keys:
+          fingerprints:
+            - "SHA256:R1U5ucEcu9pdl4mgfNo7kv7Lm6L4edvDSn9R3auqov4"
+      - checkout
+      - run:
+          <<: *install_gruntwork_utils
+      - run: |
+          export GIT_SSH_COMMAND="ssh -i /home/circleci/.ssh/id_rsa_78a64a8391239adcd479c9be8b1903c7 -o IdentitiesOnly=yes"
+          go mod tidy
+          build-go-binaries --app-name terragrunt-engine --dest-path bin --ld-flags "-X github.com/gruntwork-io/go-commons/version.Version=$CIRCLE_TAG -extldflags '-static'"
+      - persist_to_workspace:
+          root: .
+          paths: [bin]
+      - store_artifacts:
+          path: bin
 #----------------------------------------------------------------------------------------------------------------------
 # WORKFLOWS
 #----------------------------------------------------------------------------------------------------------------------
@@ -107,3 +215,33 @@ workflows:
           filters:
             tags:
               only: /^v.*/
+      - integration_tests:
+          filters:
+            tags:
+              only: /^v.*/
+          context:
+            - AWS__PHXDEVOPS__circle-ci-test
+            - GCP__automated-tests
+            - GITHUB__PAT__gruntwork-ci
+          requires:
+            - precommit
+      - test_windows:
+          filters:
+            tags:
+              only: /^v.*/
+          context:
+            - AWS__PHXDEVOPS__circle-ci-test
+            - GCP__automated-tests
+            - GITHUB__PAT__gruntwork-ci
+          requires:
+            - precommit
+      - build:
+          filters:
+            tags:
+              only: /^v.*/
+          context:
+            - AWS__PHXDEVOPS__circle-ci-test
+            - GCP__automated-tests
+            - GITHUB__PAT__gruntwork-ci
+          requires:
+            - precommit
