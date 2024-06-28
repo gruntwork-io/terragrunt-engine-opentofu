@@ -228,6 +228,7 @@ jobs:
           name: Install required packages
           command: |
             brew install coreutils gpg
+            # setting sign key
             echo "$TERRAGRUNT_GPG_KEY" | base64 --decode > privatekey.asc
             gpg --batch --import privatekey.asc
             gpg --list-keys
@@ -261,7 +262,7 @@ jobs:
             done
             cd ..
             shasum -a 256 *.zip > "terragrunt-iac-engine-opentofu_{TYPE}_${TAG}_SHA256SUMS"
-            gpg --detach-sign terragrunt-iac-engine-opentofu_{TYPE}_{TAG}_SHA256SUMS
+            gpg --batch --yes --detach-sign terragrunt-iac-engine-opentofu_{TYPE}_{TAG}_SHA256SUMS
             ls -lahrt
       - persist_to_workspace:
           root: .
