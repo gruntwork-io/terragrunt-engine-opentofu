@@ -228,6 +228,7 @@ jobs:
           name: Package release files
           command: |
             brew install coreutils
+            set -x
             TAG="v0.0.1"
             TYPE="rpc"
             mkdir -p archives
@@ -244,14 +245,18 @@ jobs:
               ARCHIVE_NAME="terragrunt-iac-engine-opentofu_${TYPE}_${TAG}_${OS}_${ARCH}.zip"
               
               # Create the zip archive
-              zip "../archives/$ARCHIVE_NAME" "$file"
+              zip "../archives/$ARCHIVE_NAME" "$BINARY_NAME"
               fi
             done
             cd ..
             shasum -a 256 *.zip > "terragrunt-iac-engine-opentofu_{TYPE}_${TAG}_SHA256SUMS"
             gpg --detach-sign terragrunt-iac-engine-opentofu_{TYPE}_{TAG}_SHA256SUMS
             ls -lahrt
-
+      - persist_to_workspace:
+          root: .
+          paths: [archives]
+      - store_artifacts:
+          path: archives
 #----------------------------------------------------------------------------------------------------------------------
 # WORKFLOWS
 #----------------------------------------------------------------------------------------------------------------------
