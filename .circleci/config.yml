@@ -225,7 +225,7 @@ jobs:
             unzip terragrunt-iac-engine-opentofu_arm64.zip
             mv terragrunt-iac-engine-opentofu_darwin_arm64 bin/
       - run:
-          name: Package release files
+          name: Install required packages
           command: |
             brew install coreutils gpg
             echo "$TERRAGRUNT_GPG_KEY" | base64 --decode > privatekey.asc
@@ -234,7 +234,9 @@ jobs:
             KEY_ID=$(gpg --list-keys --with-colons | awk -F: '/^pub/{print $5}')
             echo -e "5\ny\n" | gpg --command-fd 0 --expert --edit-key $KEY_ID trust
             gpg --list-keys
-            
+      - run:
+          name: Package release files
+          command: |
             set -x
             TAG="v0.0.1"
             TYPE="rpc"
