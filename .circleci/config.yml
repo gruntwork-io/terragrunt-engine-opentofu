@@ -218,16 +218,14 @@ jobs:
             ls
             ls -lahrt bin/
             
-            
-
             # Replace the files in bin. These are the same file names generated from .gon_amd64.hcl and .gon_arm64.hcl
             unzip terragrunt-iac-engine-opentofu_amd64.zip
-            mv terragrunt-iac-engine-opentofu_amd64 bin/
+            mv terragrunt-iac-engine-opentofu_darwin_amd64 bin/
 
             unzip terragrunt-iac-engine-opentofu_arm64.zip
-            mv terragrunt-iac-engine-opentofu_arm64 bin/
+            mv terragrunt-iac-engine-opentofu_darwin_arm64 bin/
       - run:
-          name: Run SHA256SUM
+          name: Package release files
           command: |
             brew install coreutils
             cd bin && sha256sum * > SHA256SUMS
