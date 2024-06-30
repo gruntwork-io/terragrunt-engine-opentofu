@@ -262,8 +262,7 @@ jobs:
               zip "../release/$ARCHIVE_NAME" "$BINARY_NAME"
               fi
             done
-            cd ..
-            cd release
+            cd ../release
             shasum -a 256 *.zip > "terragrunt-iac-engine-opentofu_${TYPE}_${TAG}_SHA256SUMS"
             echo "${GW_ENGINE_GPG_KEY_PW}" | gpg --batch --yes --pinentry-mode loopback --passphrase-fd 0 --default-key "${KEY_ID}" --detach-sign terragrunt-iac-engine-opentofu_${TYPE}_${TAG}_SHA256SUMS
             ls -lahrt
