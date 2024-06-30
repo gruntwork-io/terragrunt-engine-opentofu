@@ -232,16 +232,10 @@ jobs:
             # setting sign key
             echo "${GW_ENGINE_GPG_KEY}" | base64 --decode > privatekey.asc
             echo "${GW_ENGINE_GPG_KEY_PW}" | gpg --batch --yes --import privatekey.asc
-            gpg --list-keys
             KEY_ID=$(gpg --list-keys --with-colons | awk -F: '/^pub/{print $5}')
             echo -e "trust\n5\ny\n" | gpg --command-fd 0 --edit-key $KEY_ID trust
             mkdir -p ~/.gnupg
             echo "default-key $KEY_ID" >> ~/.gnupg/gpg.conf
-            # public key setup
-            gpg --export --armor $KEY_ID > publickey.asc
-            gpg --import publickey.asc
-            gpg --list-keys
-            gpg --list-secret-keys
       - run:
           name: Package release files
           command: |
@@ -250,9 +244,8 @@ jobs:
             TYPE="rpc"
             
             KEY_ID=$(gpg --list-keys --with-colons | awk -F: '/^pub/{print $5}')
-            cat ~/.gnupg/gpg.conf
 
-            mkdir -p archives
+            mkdir -p release
             cd bin
             for file in *; do
               # Extract the OS and ARCH from the file name
@@ -266,18 +259,18 @@ jobs:
               ARCHIVE_NAME="terragrunt-iac-engine-opentofu_${TYPE}_${TAG}_${OS}_${ARCH}.zip"
               
               # Create the zip archive
-              zip "../archives/$ARCHIVE_NAME" "$BINARY_NAME"
+              zip "../release/$ARCHIVE_NAME" "$BINARY_NAME"
               fi
             done
             cd ..
-            shasum -a 256 *.zip > "terragrunt-iac-engine-opentofu_${TYPE}_${TAG}_SHA256SUMS"
-            echo "${GW_ENGINE_GPG_KEY_PW}" | gpg --batch --yes --pinentry-mode loopback --passphrase-fd 0 --default-key "${KEY_ID}" --detach-sign terragrunt-iac-engine-opentofu_${TYPE}_${TAG}_SHA256SUMS
-            ls -lahrt
+            shasum -a 256 *.zip > "release/terragrunt-iac-engine-opentofu_${TYPE}_${TAG}_SHA256SUMS"
+            echo "${GW_ENGINE_GPG_KEY_PW}" | gpg --batch --yes --pinentry-mode loopback --passphrase-fd 0 --default-key "${KEY_ID}" --detach-sign release/terragrunt-iac-engine-opentofu_${TYPE}_${TAG}_SHA256SUMS
+            ls -lahrt release
       - persist_to_workspace:
           root: .
-          paths: [archives]
+          paths: [release]
       - store_artifacts:
-          path: archives
+          path: release
 #----------------------------------------------------------------------------------------------------------------------
 # WORKFLOWS
 #----------------------------------------------------------------------------------------------------------------------
