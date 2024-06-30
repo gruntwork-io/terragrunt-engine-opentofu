@@ -238,33 +238,12 @@ jobs:
       - run:
           name: Package release files
           command: |
+            export TAG="${CIRCLE_TAG}"
+            if [[ "$TAG" != *"-rc-"* ]]; then
+                exit 0
+            fi
+            ./.circleci/sign-files.sh
 
-            TAG="v0.0.1"
-            TYPE="rpc"
-            
-            KEY_ID=$(gpg --list-keys --with-colons | awk -F: '/^pub/{print $5}')
-
-            mkdir -p release
-            cd bin
-            for file in *; do
-              # Extract the OS and ARCH from the file name
-              if [[ $file =~ terragrunt-iac-engine-opentofu_([^_]+)_([^_]+) ]]; then
-              OS="${BASH_REMATCH[1]}"
-              ARCH="${BASH_REMATCH[2]}"
-              
-              # Set the binary and archive names
-              BINARY_NAME="terragrunt-iac-engine-opentofu_${TAG}"
-              mv "$file" "$BINARY_NAME"
-              ARCHIVE_NAME="terragrunt-iac-engine-opentofu_${TYPE}_${TAG}_${OS}_${ARCH}.zip"
-              
-              # Create the zip archive
-              zip "../release/$ARCHIVE_NAME" "$BINARY_NAME"
-              fi
-            done
-            cd ../release
-            shasum -a 256 *.zip > "terragrunt-iac-engine-opentofu_${TYPE}_${TAG}_SHA256SUMS"
-            echo "${GW_ENGINE_GPG_KEY_PW}" | gpg --batch --yes --pinentry-mode loopback --passphrase-fd 0 --default-key "${KEY_ID}" --detach-sign terragrunt-iac-engine-opentofu_${TYPE}_${TAG}_SHA256SUMS
-            ls -lahrt
       - run: upload-github-release-assets --git-tag test release/*
       - persist_to_workspace:
           root: .
