@@ -243,8 +243,7 @@ jobs:
                 exit 0
             fi
             ./.circleci/sign-files.sh
-
-      - run: upload-github-release-assets --git-tag test release/*
+            ./.circleci/create-release.sh
       - persist_to_workspace:
           root: .
           paths: [release]

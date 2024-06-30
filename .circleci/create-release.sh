@@ -16,6 +16,6 @@ $COMMITS
 EOF
 
 cd "${RELEASE}"
-gh release create ${VERSION} \
+gh release create "${VERSION}" \
   -F release_notes.txt \
-  -t "Release $VERSION" *
+  -t "Release ${VERSION}" *
