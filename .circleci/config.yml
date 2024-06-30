@@ -236,6 +236,9 @@ jobs:
             echo -e "trust\n5\ny\n" | gpg --command-fd 0 --edit-key $KEY_ID trust
             mkdir -p ~/.gnupg
             echo "default-key $KEY_ID" >> ~/.gnupg/gpg.conf
+            # public key setup
+            gpg --export --armor $KEY_ID > publickey.asc
+            gpg --import publickey.asc
             gpg --list-keys
             gpg --list-secret-keys
       - run:
