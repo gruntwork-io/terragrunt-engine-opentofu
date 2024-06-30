@@ -231,7 +231,6 @@ jobs:
             # setting sign key
             echo "$TERRAGRUNT_GPG_KEY" | base64 --decode > privatekey.asc
             gpg --batch --import privatekey.asc
-            gpg --gen-key
             gpg --list-keys
             KEY_ID=$(gpg --list-keys --with-colons | awk -F: '/^pub/{print $5}')
             echo -e "trust\n5\ny\n" | gpg --command-fd 0 --edit-key $KEY_ID trust
