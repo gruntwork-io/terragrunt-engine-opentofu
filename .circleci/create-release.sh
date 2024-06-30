@@ -17,7 +17,5 @@ $COMMITS
 EOF
 
 gh auth status
-gh release create "${VERSION}" -F release_notes.txt -t "Release ${VERSION}"
+gh release create "${VERSION}" -F release_notes.txt -t "${VERSION}" release/*
 
-# Upload the release assets
-upload-github-release-assets --git-tag "${VERSION}" release/*
