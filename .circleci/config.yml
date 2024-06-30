@@ -215,9 +215,7 @@ jobs:
             sign-binary --os mac .gon_arm64.hcl
             echo "Done signing the binary"
             mkdir -p bin
-            ls
-            ls -lahrt bin/
-            
+           
             # Replace the files in bin. These are the same file names generated from .gon_amd64.hcl and .gon_arm64.hcl
             unzip terragrunt-iac-engine-opentofu_amd64.zip
             mv terragrunt-iac-engine-opentofu_darwin_amd64 bin/
