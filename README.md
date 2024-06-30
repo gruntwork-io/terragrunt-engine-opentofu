@@ -2,3 +2,5 @@
 
 OpenTofu Terragrunt engine
 
+## Automated Release Process
+

@@ -18,5 +18,5 @@ EOF
 
 cd "${RELEASE}"
 gh release create "${VERSION}" \
-  -F release_notes.txt \
+  -F ../release_notes.txt \
   -t "Release ${VERSION}" *
