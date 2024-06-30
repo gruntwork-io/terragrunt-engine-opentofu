@@ -16,7 +16,9 @@ $COMMITS
 
 EOF
 
-cd "${RELEASE}"
 gh release create "${VERSION}" \
-  -F ../release_notes.txt \
-  -t "Release ${VERSION}" *
+  -F release_notes.txt \
+  -t "Release ${VERSION}"
+
+# Upload the release assets
+upload-github-release-assets --git-tag "${VERSION}" release/*
