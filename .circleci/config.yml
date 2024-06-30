@@ -248,6 +248,7 @@ jobs:
             TAG="v0.0.1"
             TYPE="rpc"
             
+            export GPG_TTY=$(tty)
             KEY_ID=$(gpg --list-keys --with-colons | awk -F: '/^pub/{print $5}')
             cat ~/.gnupg/gpg.conf
 
