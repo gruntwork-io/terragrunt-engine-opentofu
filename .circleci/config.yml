@@ -239,9 +239,6 @@ jobs:
           name: Package release files
           command: |
             export TAG="${CIRCLE_TAG}"
-            if [[ "$TAG" != *"-rc-"* ]]; then
-                exit 0
-            fi
             ./.circleci/sign-files.sh
             ./.circleci/create-release.sh
       - persist_to_workspace:
@@ -308,6 +305,11 @@ workflows:
       - release:
           requires:
             - build
+          filters:
+            tags:
+              only: /^.*-rc-.*$/
+            branches:
+              ignore: /.*/
           context:
             - AWS__PHXDEVOPS__circle-ci-test
             - GCP__automated-tests
