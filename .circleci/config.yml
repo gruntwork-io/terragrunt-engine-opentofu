@@ -238,6 +238,7 @@ jobs:
             mkdir -p ~/.gnupg
             echo "default-key $KEY_ID" >> ~/.gnupg/gpg.conf
             gpg --list-keys
+            gpg --list-secret-keys
       - run:
           name: Package release files
           command: |
