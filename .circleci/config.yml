@@ -227,7 +227,7 @@ jobs:
       - run:
           name: Install required packages
           command: |
-            brew install coreutils gpg
+            brew install coreutils gpg gh
             # setting sign key
             echo "${GW_ENGINE_GPG_KEY}" | base64 --decode > privatekey.asc
             echo "${GW_ENGINE_GPG_KEY_PW}" | gpg --batch --yes --import privatekey.asc
