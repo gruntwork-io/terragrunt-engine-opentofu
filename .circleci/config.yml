@@ -188,7 +188,7 @@ jobs:
           paths: [bin]
       - store_artifacts:
           path: bin
-  deploy:
+  release:
     <<: *env
     macos:
       xcode: 15.3.0
@@ -305,7 +305,7 @@ workflows:
             - GITHUB__PAT__gruntwork-ci
           requires:
             - precommit
-      - deploy:
+      - release:
           requires:
             - build
           context:
