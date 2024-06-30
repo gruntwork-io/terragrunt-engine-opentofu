@@ -227,7 +227,6 @@ jobs:
       - run:
           name: Install required packages
           command: |
-            set -x
             brew install coreutils gpg
             # setting sign key
             echo "${GW_ENGINE_GPG_KEY}" | base64 --decode > privatekey.asc
@@ -239,7 +238,7 @@ jobs:
       - run:
           name: Package release files
           command: |
-            set -x
+
             TAG="v0.0.1"
             TYPE="rpc"
             
@@ -266,7 +265,7 @@ jobs:
             shasum -a 256 *.zip > "terragrunt-iac-engine-opentofu_${TYPE}_${TAG}_SHA256SUMS"
             echo "${GW_ENGINE_GPG_KEY_PW}" | gpg --batch --yes --pinentry-mode loopback --passphrase-fd 0 --default-key "${KEY_ID}" --detach-sign terragrunt-iac-engine-opentofu_${TYPE}_${TAG}_SHA256SUMS
             ls -lahrt
-      - run: upload-github-release-assets --tag test release/*
+      - run: upload-github-release-assets --git-tag test release/*
       - persist_to_workspace:
           root: .
           paths: [release]
