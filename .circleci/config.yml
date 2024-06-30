@@ -307,7 +307,7 @@ workflows:
             - build
           filters:
             tags:
-              only: /^.*-rc-.*$/
+              only: /^.*-rc.*$/
             branches:
               ignore: /.*/
           context:
