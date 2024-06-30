@@ -245,6 +245,7 @@ jobs:
             TYPE="rpc"
             
             KEY_ID=$(gpg --list-keys --with-colons | awk -F: '/^pub/{print $5}')
+            cat ~/.gnupg/gpg.conf
 
             mkdir -p archives
             cd bin
@@ -264,8 +265,8 @@ jobs:
               fi
             done
             cd ..
-            shasum -a 256 *.zip > "terragrunt-iac-engine-opentofu_{TYPE}_${TAG}_SHA256SUMS"
-            gpg --batch --yes --default-key "${KEY_ID}" --detach-sign terragrunt-iac-engine-opentofu_{TYPE}_{TAG}_SHA256SUMS
+            shasum -a 256 *.zip > "terragrunt-iac-engine-opentofu_${TYPE}_${TAG}_SHA256SUMS"
+            gpg --batch --yes --default-key "${KEY_ID}" --detach-sign terragrunt-iac-engine-opentofu_${TYPE}_${TAG}_SHA256SUMS
             ls -lahrt
       - persist_to_workspace:
           root: .
