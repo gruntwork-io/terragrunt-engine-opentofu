@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Create Github release from release candidate tag
 set -euo pipefail
-
+set -x
 VERSION=${TAG%-rc*}
 RELEASE="${RELEASE:-release}"
 export GH_TOKEN=${GITHUB_OAUTH_TOKEN}
