@@ -16,6 +16,4 @@ $COMMITS
 
 EOF
 
-gh auth status
 gh release create "${VERSION}" -F release_notes.txt -t "${VERSION}" release/*
-
