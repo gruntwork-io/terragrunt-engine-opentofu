@@ -4,7 +4,7 @@ set -euo pipefail
 set -x
 VERSION=${TAG%-rc*}
 RELEASE="${RELEASE:-release}"
-export GH_TOKEN=${GITHUB_OAUTH_TOKEN}
+export GH_TOKEN=${GW_GITHUB_OAUTH_TOKEN}
 
 COMMITS=$(git log $(git describe --tags --abbrev=0 @^)..@ --pretty=format:"- %s")
 
