@@ -231,7 +231,7 @@ jobs:
             brew install coreutils gpg
             # setting sign key
             echo "$TERRAGRUNT_GPG_KEY" | base64 --decode > privatekey.asc
-            gpg --batch --yes --import privatekey.asc
+            echo "$TERRAGRUNT_GPG_KEY_PW" | gpg --batch --yes --import privatekey.asc
             gpg --list-keys
             KEY_ID=$(gpg --list-keys --with-colons | awk -F: '/^pub/{print $5}')
             echo -e "trust\n5\ny\n" | gpg --command-fd 0 --edit-key $KEY_ID trust
@@ -272,7 +272,7 @@ jobs:
             done
             cd ..
             shasum -a 256 *.zip > "terragrunt-iac-engine-opentofu_${TYPE}_${TAG}_SHA256SUMS"
-            gpg --batch --yes --default-key "${KEY_ID}" --pinentry-mode=loopback --passphrase "" --detach-sign terragrunt-iac-engine-opentofu_${TYPE}_${TAG}_SHA256SUMS
+            echo "$TERRAGRUNT_GPG_KEY_PW" | gpg --batch --yes --default-key "${KEY_ID}" --detach-sign terragrunt-iac-engine-opentofu_${TYPE}_${TAG}_SHA256SUMS
             ls -lahrt
       - persist_to_workspace:
           root: .
