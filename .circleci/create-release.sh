@@ -133,7 +133,7 @@ function main() {
   create_rc_release_notes
   # check if rc release exists, create if missing
   if ! gh release view "${RC_VERSION}" > /dev/null 2>&1; then
-    gh release create "${RC_VERSION}" --prerelease -F rc_release_notes.txt -t "${RC_VERSION}"
+    gh release create "${RC_VERSION}" --prerelease -F rc_release_notes.txt -t "${RC_VERSION}" release/*
   fi
   verify_and_reupload_assets "${RC_VERSION}" "release"
 
