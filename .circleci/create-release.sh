@@ -8,6 +8,7 @@ export GH_TOKEN=${GW_GITHUB_OAUTH_TOKEN}
 readonly REPO_OWNER="${REPO_OWNER:-gruntwork-io}"
 readonly REPO_NAME="${REPO_NAME:-terragrunt-engine-opentofu}"
 readonly MAX_RETRIES=${MAX_RETRIES:-10}
+readonly RETRY_INTERVAL=${RETRY_INTERVAL:-1}
 
 readonly RC_VERSION=${TAG}
 readonly VERSION=${TAG%-rc*}
@@ -116,6 +117,30 @@ verify_and_reupload_assets() {
   done
 }
 
+function check_github_release() {
+  local retries=0
+  local release_tag=$1
+
+  while [ $retries -lt $MAX_RETRIES ]; do
+    response=$(curl -s -o /dev/null -w "%{http_code}" \
+      -H "Accept: application/vnd.github.v3+json" \
+      -H "X-GitHub-Api-Version: 2022-11-28" \
+      -H "Authorization: token $GITHUB_OAUTH_TOKEN" \
+      "https://api.github.com/repos/$REPO_OWNER/$REPO_NAME/releases/tags/$release_tag")
+
+    if [ "$response" -eq 200 ]; then
+      echo "Release $release_tag found."
+      return 0
+    else
+      echo "Release $release_tag not found. Retrying in $RETRY_INTERVAL seconds..."
+      ((retries++))
+      sleep $RETRY_INTERVAL
+    fi
+  done
+
+  echo "Failed to find release $release_tag after $MAX_RETRIES retries. Exiting..."
+  exit 1
+}
 
 function download_release_assets() {
   local -r release_tag=$1
@@ -135,6 +160,7 @@ function main() {
   if ! gh release view "${RC_VERSION}" > /dev/null 2>&1; then
     gh release create "${RC_VERSION}" --prerelease -F rc_release_notes.txt -t "${RC_VERSION}" release/*
   fi
+  check_github_release "${RC_VERSION}"
   verify_and_reupload_assets "${RC_VERSION}" "release"
 
   # download rc assets
@@ -146,7 +172,7 @@ function main() {
   if ! gh release view "${VERSION}" > /dev/null 2>&1; then
     gh release create "${VERSION}" -F release_notes.txt -t "${VERSION}" release-bin/*
   fi
-
+  check_github_release "${VERSION}"
   verify_and_reupload_assets "${VERSION}" "release-bin"
 }
 
