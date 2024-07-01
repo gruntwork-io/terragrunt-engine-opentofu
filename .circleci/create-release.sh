@@ -131,7 +131,7 @@ function main() {
   if ! gh release view "${RC_VERSION}" > /dev/null 2>&1; then
     gh release create "${RC_VERSION}" --prerelease -F rc_release_notes.txt -t "${RC_VERSION}"
   fi
-  verify_and_reupload_asset "${RC_VERSION}" "release"
+  verify_and_reupload_assets "${RC_VERSION}" "release"
 
   # download rc assets
   download_release_assets "$RC_VERSION" "release-bin"
@@ -143,7 +143,7 @@ function main() {
     gh release create "${VERSION}" -F release_notes.txt -t "${VERSION}" release-bin/*
   fi
 
-  verify_and_reupload_asset "${VERSION}" "release-bin"
+  verify_and_reupload_assets "${VERSION}" "release-bin"
 }
 
 main "$@"
