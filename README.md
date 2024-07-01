@@ -11,7 +11,7 @@ To initiate the release process, create a pre-release named using the following 
 
 Workflow:
 * Tag Creation:
-  * Push a tag ending with `-rc...` to the repository.
+  * Create a pre-release ending with `-rc...` to the repository.
   * This tag format will automatically trigger a CircleCI job.
 * CI/CD Process:
   * CircleCI will run a build job to compile binaries and perform necessary checks.
