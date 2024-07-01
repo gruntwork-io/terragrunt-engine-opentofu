@@ -5,6 +5,10 @@ set -x
 
 export GH_TOKEN=${GW_GITHUB_OAUTH_TOKEN}
 
+readonly REPO_OWNER="${REPO_OWNER:-gruntwork-io}"
+readonly REPO_NAME="${REPO_NAME:-terragrunt-engine-opentofu}"
+readonly MAX_RETRIES=${MAX_RETRIES:-10}
+
 readonly RC_VERSION=${TAG}
 readonly VERSION=${TAG%-rc*}
 readonly RELEASE="${RELEASE:-release}"
