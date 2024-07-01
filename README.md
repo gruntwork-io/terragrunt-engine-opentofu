@@ -4,7 +4,7 @@ OpenTofu Terragrunt engine
 
 ## Automated Release Process
 
-To initiate the release process, create a tag in the following format: `vx.y.z-rcdateincrement`
+To initiate the release process, create a pre-release named using the following naming convention: `vx.y.z-rcdateincrement`, with the appropriate corresponding tag.
 * Example Tag: `v0.0.1-rc2024053001`
   * `v0.0.1` represents the version number.
   * `-rc2024053001` indicates a release candidate, with the date and an incrementing identifier.
