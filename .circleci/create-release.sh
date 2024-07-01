@@ -3,11 +3,11 @@
 set -euo pipefail
 set -x
 
-readonly RC_VERSION=${TAG}
-readonly VERSION=${TAG%-rc*}
-readonly RELEASE="${RELEASE:-release}"
+export RC_VERSION=${TAG}
+export VERSION=${TAG%-rc*}
+export RELEASE="${RELEASE:-release}"
 export GH_TOKEN=${GW_GITHUB_OAUTH_TOKEN}
-readonly COMMITS=$(git log $(git describe --tags --abbrev=0 @^)..@ --pretty=format:"- %s")
+export COMMITS=$(git log $(git describe --tags --abbrev=0 @^)..@ --pretty=format:"- %s")
 
 function create_rc_release_notes() {
   cat << EOF > rc_release_notes.txt
