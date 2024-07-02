@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 # Create Github release from release candidate tag
 set -euo pipefail
-set -x
 
 export GH_TOKEN=${GW_GITHUB_OAUTH_TOKEN}
 
@@ -155,7 +154,6 @@ function main() {
   # check if rc release exists, create if missing
   if ! gh release view "${RC_VERSION}" > /dev/null 2>&1; then
     gh release create "${RC_VERSION}" --prerelease -F rc_release_notes.txt -t "${RC_VERSION}" release/*
-    sleep $RETRY_INTERVAL
   fi
   check_github_release "${RC_VERSION}"
   verify_and_reupload_assets "${RC_VERSION}" "release"
@@ -168,7 +166,6 @@ function main() {
   # check if release exists, create if missing
   if ! gh release view "${VERSION}" > /dev/null 2>&1; then
     gh release create "${VERSION}" -F release_notes.txt -t "${VERSION}" release-bin/*
-    sleep $RETRY_INTERVAL
   fi
   check_github_release "${VERSION}"
   verify_and_reupload_assets "${VERSION}" "release-bin"
