@@ -63,24 +63,24 @@ function check_release_exists() {
   fi
 }
 
-get_release_id() {
+function get_release_id() {
   local -r release_response=$1
 
   echo "$release_response" | jq -r '.id'
 }
 
-get_asset_urls() {
+function get_asset_urls() {
   local -r release_response=$1
 
   echo "$release_response" | jq -r '.assets[].browser_download_url'
 }
 
-verify_and_reupload_assets() {
+function verify_and_reupload_assets() {
   local -r release_version=$1
   local -r asset_dir=$2
 
   local release_response
-  release_response=$(get_release_response "$release_version")
+  release_response=$(gh api -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" "/repos/$REPO_OWNER/$REPO_NAME/releases/tags/$release_version")
 
   check_release_exists "$release_response"
   local release_id
@@ -93,26 +93,19 @@ verify_and_reupload_assets() {
     asset_name=$(basename "$asset_url")
 
     for ((i=0; i<MAX_RETRIES; i++)); do
-      if ! curl -sILf -H "Authorization: token $GH_TOKEN" -H "X-GitHub-Api-Version: 2022-11-28" "$asset_url" > /dev/null; then
+      if ! gh api "$asset_url" --method HEAD > /dev/null 2>&1; then
         echo "Failed to download the asset $asset_name. Uploading..."
 
         # Delete the asset
         local asset_id
         asset_id=$(jq -r --arg asset_name "$asset_name" '.assets[] | select(.name == $asset_name) | .id' <<< "$release_response")
-        curl -s -L -XDELETE \
-          -H "Accept: application/vnd.github.v3+json" \
-          -H "Authorization: token $GITHUB_OAUTH_TOKEN" \
-          -H "X-GitHub-Api-Version: 2022-11-28" \
-          "https://api.github.com/repos/$REPO_OWNER/$REPO_NAME/releases/assets/$asset_id" > /dev/null
+        gh api -X DELETE "/repos/$REPO_OWNER/$REPO_NAME/releases/assets/$asset_id"
 
         # Re-upload the asset
-        curl -s -L -XPOST \
-          -H "Accept: application/vnd.github.v3+json" \
-          -H "Authorization: token $GITHUB_OAUTH_TOKEN" \
-          -H "X-GitHub-Api-Version: 2022-11-28" \
+        gh api "/repos/$REPO_OWNER/$REPO_NAME/releases/$release_id/assets?name=$asset_name" \
+          --method POST \
           -H "Content-Type: application/octet-stream" \
-          --data-binary "@${asset_dir}/${asset_name}" \
-          "https://uploads.github.com/repos/$REPO_OWNER/$REPO_NAME/releases/$release_id/assets?name=${asset_name}" > /dev/null
+          --input "${asset_dir}/${asset_name}"
 
         sleep $RETRY_INTERVAL
       else
