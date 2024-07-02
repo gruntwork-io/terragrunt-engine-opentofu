@@ -38,11 +38,20 @@ EOF
 function get_release_response() {
   local -r release_tag=$1
 
-  curl -s \
-    -H "Accept: application/vnd.github.v3+json" \
-    -H "Authorization: token $GITHUB_OAUTH_TOKEN" \
-    -H "X-GitHub-Api-Version: 2022-11-28" \
-    "https://api.github.com/repos/$REPO_OWNER/$REPO_NAME/releases/tags/$release_tag"
+  # First try using the gh CLI
+  local response
+  if response=$(gh api -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" \
+    "/repos/$REPO_OWNER/$REPO_NAME/releases/tags/$release_tag" 2> /dev/null); then
+    echo "$response"
+  else
+    # Fallback to using curl if gh CLI fails
+    response=$(curl -s \
+      -H "Accept: application/vnd.github.v3+json" \
+      -H "Authorization: token $GH_TOKEN" \
+      -H "X-GitHub-Api-Version: 2022-11-28" \
+      "https://api.github.com/repos/$REPO_OWNER/$REPO_NAME/releases/tags/$release_tag")
+    echo "$response"
+  fi
 }
 
 function check_release_exists() {
