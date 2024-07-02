@@ -131,13 +131,8 @@ function check_github_release() {
   local release_tag=$1
 
   while [ $retries -lt $MAX_RETRIES ]; do
-    response=$(curl -s -o /dev/null -w "%{http_code}" \
-      -H "Accept: application/vnd.github.v3+json" \
-      -H "X-GitHub-Api-Version: 2022-11-28" \
-      -H "Authorization: token $GITHUB_OAUTH_TOKEN" \
-      "https://api.github.com/repos/$REPO_OWNER/$REPO_NAME/releases/tags/$release_tag")
-
-    if [ "$response" -eq 200 ]; then
+    if gh api -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" \
+      "/repos/$REPO_OWNER/$REPO_NAME/releases" | jq -e --arg tag "$release_tag" '.[] | select(.tag_name == $tag)' > /dev/null; then
       echo "Release $release_tag found."
       return 0
     else
