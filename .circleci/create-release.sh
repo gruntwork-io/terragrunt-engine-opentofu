@@ -93,7 +93,7 @@ verify_and_reupload_assets() {
     asset_name=$(basename "$asset_url")
 
     for ((i=0; i<MAX_RETRIES; i++)); do
-      if ! curl -sILf "$asset_url" > /dev/null; then
+      if ! curl -sILf -H "Authorization: token $GH_TOKEN" -H "X-GitHub-Api-Version: 2022-11-28" "$asset_url" > /dev/null; then
         echo "Failed to download the asset $asset_name. Uploading..."
 
         # Delete the asset
