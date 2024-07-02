@@ -79,43 +79,40 @@ function verify_and_reupload_assets() {
   local -r release_version=$1
   local -r asset_dir=$2
 
-  local release_response
-  release_response=$(gh api -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" "/repos/$REPO_OWNER/$REPO_NAME/releases/tags/$release_version")
+  # Get the list of assets for the release
+  local assets
+  assets=$(gh release view "$release_version" --json assets --jq '.assets[].name')
 
-  check_release_exists "$release_response"
-  local release_id
-  release_id=$(get_release_id "$release_response")
-  local asset_urls
-  asset_urls=$(get_asset_urls "$release_response")
+  if [ -z "$assets" ]; then
+    echo "No assets found for release $release_version"
+    return
+  fi
 
-  for asset_url in $asset_urls; do
-    local asset_name
-    asset_name=$(basename "$asset_url")
-
+  for asset in $assets; do
     for ((i=0; i<MAX_RETRIES; i++)); do
-      if ! gh api "$asset_url" --method HEAD > /dev/null 2>&1; then
-        echo "Failed to download the asset $asset_name. Uploading..."
+      if ! gh release download "$release_version" --pattern "$asset" --dir /tmp > /dev/null 2>&1; then
+        echo "Failed to download the asset $asset. Uploading..."
 
-        # Delete the asset
-        local asset_id
-        asset_id=$(jq -r --arg asset_name "$asset_name" '.assets[] | select(.name == $asset_name) | .id' <<< "$release_response")
-        gh api -X DELETE "/repos/$REPO_OWNER/$REPO_NAME/releases/assets/$asset_id"
+        # Delete the asset if it exists
+        gh release delete-asset "$release_version" "$asset" --yes || true
 
         # Re-upload the asset
-        gh api "/repos/$REPO_OWNER/$REPO_NAME/releases/$release_id/assets?name=$asset_name" \
-          --method POST \
-          -H "Content-Type: application/octet-stream" \
-          --input "${asset_dir}/${asset_name}"
-
-        sleep $RETRY_INTERVAL
+        if ! gh release upload "$release_version" "${asset_dir}/${asset}"; then
+          echo "Failed to upload $asset"
+          sleep $RETRY_INTERVAL
+        else
+          echo "Successfully uploaded $asset"
+          break
+        fi
       else
-        echo "Successfully checked the asset $asset_name"
+        echo "Successfully checked the asset $asset"
+        rm -f "/tmp/$asset"
         break
       fi
     done
 
     if (( i == MAX_RETRIES )); then
-      echo "Failed to download the asset $asset_name after $MAX_RETRIES retries. Exiting..."
+      echo "Failed to process the asset $asset after $MAX_RETRIES retries. Exiting..."
       exit 1
     fi
   done
