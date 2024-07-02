@@ -94,7 +94,7 @@ verify_and_reupload_assets() {
 
     for ((i=0; i<MAX_RETRIES; i++)); do
       if ! curl -sILf "$asset_url" > /dev/null; then
-        echo "Failed to download the asset $asset_name. Retrying..."
+        echo "Failed to download the asset $asset_name. Uploading..."
 
         # Delete the asset
         local asset_id
@@ -113,6 +113,8 @@ verify_and_reupload_assets() {
           -H "Content-Type: application/octet-stream" \
           --data-binary "@${asset_dir}/${asset_name}" \
           "https://uploads.github.com/repos/$REPO_OWNER/$REPO_NAME/releases/$release_id/assets?name=${asset_name}" > /dev/null
+
+        sleep $RETRY_INTERVAL
       else
         echo "Successfully checked the asset $asset_name"
         break
