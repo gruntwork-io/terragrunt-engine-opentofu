@@ -92,11 +92,8 @@ function verify_and_reupload_assets() {
       if ! gh release download "$release_version" --pattern "$asset" --dir /tmp > /dev/null 2>&1; then
         echo "Failed to download the asset $asset. Uploading..."
 
-        # Delete the asset if it exists
-        gh release delete-asset "$release_version" "$asset" --yes || true
-
         # Re-upload the asset
-        if ! gh release upload "$release_version" "${asset_dir}/${asset}"; then
+        if ! gh release upload --clobber "$release_version" "${asset_dir}/${asset}"; then
           echo "Failed to upload $asset"
           sleep $RETRY_INTERVAL
         else
