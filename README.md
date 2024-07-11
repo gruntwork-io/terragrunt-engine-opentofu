@@ -1,7 +1,6 @@
 # terragrunt-engine-opentofu
 
-OpenTofu Terragrunt engine
-
+OpenTofu Terragrunt engine implemented based on spec from [terragrunt-engine-go](https://github.com/gruntwork-io/terragrunt-engine-go)
 ## Automated Release Process
 
 To initiate the release process, create a pre-release named using the following naming convention: `vx.y.z-rcdateincrement`, with the appropriate corresponding tag.
