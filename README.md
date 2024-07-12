@@ -19,3 +19,7 @@ Workflow:
   * The release job creates a new GitHub release. 
   * All compiled assets, including checksums and signatures, are uploaded to the release.
 
+## License
+
+[Mozilla Public License v2.0](./LICENSE)
+
