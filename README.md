@@ -36,3 +36,6 @@ Workflow:
 
 Contributions are welcome! Checkout out the [Contributing Guidelines](./CONTRIBUTING.md) for more information.
 
+## License
+
+[Mozilla Public License v2.0](./LICENSE)
