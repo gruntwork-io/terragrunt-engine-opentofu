@@ -3,7 +3,7 @@ module github.com/gruntwork-io/terragrunt-engine-opentofu
 go 1.21
 
 require (
-	github.com/gruntwork-io/terragrunt-engine-go v0.0.1
+	github.com/gruntwork-io/terragrunt-engine-go v0.0.2
 	github.com/hashicorp/go-plugin v1.6.1
 	github.com/kr/pty v1.1.8
 	github.com/sirupsen/logrus v1.9.3
