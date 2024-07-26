@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+set -x
 # This script is used to sign the release files with the GPG key
 set -euo pipefail
 
@@ -26,7 +27,7 @@ function process_files() {
       ARCH="${BASH_REMATCH[2]}"
 
       # Set the binary and archive names
-      BINARY_NAME="terragrunt-iac-engine-${NAME}_${VERSION}"
+      BINARY_NAME="terragrunt-iac-engine-${NAME}_${TYPE}_${VERSION}_${OS}_${ARCH}"
       mv "${file}" "${BINARY_NAME}"
       ARCHIVE_NAME="terragrunt-iac-engine-${NAME}_${TYPE}_${VERSION}_${OS}_${ARCH}.zip"
 
