@@ -31,7 +31,7 @@ function process_files() {
       ARCHIVE_NAME="terragrunt-iac-engine-${NAME}_${TYPE}_${VERSION}_${OS}_${ARCH}.zip"
 
       # Create the zip archive
-      zip "../${RELEASE}/${ARCHIVE_NAME}" "${BINARY_NAME}"
+      zip "${ARCHIVE_NAME}" "${BINARY_NAME}"
     fi
   done
   cd ..
@@ -39,9 +39,14 @@ function process_files() {
 
 # Function to create the SHA256SUMS file
 function create_shasums_file() {
-  cd "${RELEASE}"
+  cd "${BIN}"
   # Create the SHA256SUMS file for all files in the release directory
   shasum -a 256 * > "terragrunt-iac-engine-${NAME}_${TYPE}_${VERSION}_SHA256SUMS"
+  cd "${RELEASE}"
+  # collect release files
+  cp "../${BIN}/terragrunt-iac-engine-${NAME}_${TYPE}_${VERSION}_SHA256SUMS" .
+  cp "../${BIN}/*.zip" .
+
 }
 
 # Function to sign the SHA256SUMS file
