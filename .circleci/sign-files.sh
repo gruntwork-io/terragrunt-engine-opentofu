@@ -40,7 +40,8 @@ function process_files() {
 # Function to create the SHA256SUMS file
 function create_shasums_file() {
   cd "${RELEASE}"
-  shasum -a 256 *.zip > "terragrunt-iac-engine-${NAME}_${TYPE}_${VERSION}_SHA256SUMS"
+  # Create the SHA256SUMS file for all files in the release directory
+  shasum -a 256 * > "terragrunt-iac-engine-${NAME}_${TYPE}_${VERSION}_SHA256SUMS"
 }
 
 # Function to sign the SHA256SUMS file
