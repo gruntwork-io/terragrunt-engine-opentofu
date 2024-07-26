@@ -42,7 +42,7 @@ function create_shasums_file() {
   cd "${BIN}"
   # Create the SHA256SUMS file for all files in the release directory
   shasum -a 256 * > "terragrunt-iac-engine-${NAME}_${TYPE}_${VERSION}_SHA256SUMS"
-  cd "${RELEASE}"
+  cd "../${RELEASE}"
   # collect release files
   cp "../${BIN}/terragrunt-iac-engine-${NAME}_${TYPE}_${VERSION}_SHA256SUMS" .
   cp "../${BIN}/*.zip" .
