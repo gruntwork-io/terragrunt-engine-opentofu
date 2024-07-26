@@ -45,9 +45,7 @@ function create_shasums_file() {
   shasum -a 256 * > "terragrunt-iac-engine-${NAME}_${TYPE}_${VERSION}_SHA256SUMS"
   cd "../${RELEASE}"
   # collect release files
-  cp "../${BIN}/terragrunt-iac-engine-${NAME}_${TYPE}_${VERSION}_SHA256SUMS" .
-  cp "../${BIN}/*.zip" .
-
+  cp -Rfv "../${BIN}/*" .
 }
 
 # Function to sign the SHA256SUMS file
