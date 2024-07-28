@@ -53,7 +53,6 @@ function create_shasums_file() {
   cd "../${RELEASE}"
   ls -lahrt
   pwd
-  ls -lahrt
 }
 
 # Function to sign the SHA256SUMS file
