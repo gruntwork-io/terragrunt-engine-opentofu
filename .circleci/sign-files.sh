@@ -48,12 +48,11 @@ function create_shasums_file() {
   ls -lahrt
   # Create the SHA256SUMS file for all files in the release directory
   shasum -a 256 * > "terragrunt-iac-engine-${NAME}_${TYPE}_${VERSION}_SHA256SUMS"
+  cp * ../"${RELEASE}"
   ls -lahrt
   cd "../${RELEASE}"
   ls -lahrt
   pwd
-  # collect release files
-  cp -fv "${pwd}/${BIN}/*" .
   ls -lahrt
 }
 
