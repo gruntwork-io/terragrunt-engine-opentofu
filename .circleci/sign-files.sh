@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-set -x
 # This script is used to sign the release files with the GPG key
 set -euo pipefail
 
@@ -41,19 +40,12 @@ function process_files() {
 # Function to create the SHA256SUMS file
 function create_shasums_file() {
   pwd=$(pwd)
-  ls -lahrt
-  pwd
   cd "${BIN}"
-  pwd
-  ls -lahrt
   # Create the SHA256SUMS file for all files in the release directory
   shasum -a 256 * > "terragrunt-iac-engine-${NAME}_${TYPE}_${VERSION}_SHA256SUMS"
   cp *.zip ../"${RELEASE}"
   cp "terragrunt-iac-engine-${NAME}_${TYPE}_${VERSION}_SHA256SUMS" ../"${RELEASE}"
-  ls -lahrt
   cd "../${RELEASE}"
-  ls -lahrt
-  pwd
 }
 
 # Function to sign the SHA256SUMS file
