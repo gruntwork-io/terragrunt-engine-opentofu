@@ -26,7 +26,7 @@ function process_files() {
       ARCH="${BASH_REMATCH[2]}"
 
       # Set the binary and archive names
-      BINARY_NAME="terragrunt-iac-engine-${NAME}_${VERSION}"
+      BINARY_NAME="terragrunt-iac-engine-${NAME}_${TYPE}_${VERSION}_${OS}_${ARCH}"
       mv "${file}" "${BINARY_NAME}"
       ARCHIVE_NAME="terragrunt-iac-engine-${NAME}_${TYPE}_${VERSION}_${OS}_${ARCH}.zip"
 
@@ -39,14 +39,13 @@ function process_files() {
 
 # Function to create the SHA256SUMS file
 function create_shasums_file() {
+  pwd=$(pwd)
   cd "${BIN}"
   # Create the SHA256SUMS file for all files in the release directory
   shasum -a 256 * > "terragrunt-iac-engine-${NAME}_${TYPE}_${VERSION}_SHA256SUMS"
-  cd "${RELEASE}"
-  # collect release files
-  cp "../${BIN}/terragrunt-iac-engine-${NAME}_${TYPE}_${VERSION}_SHA256SUMS" .
-  cp "../${BIN}/*.zip" .
-
+  cp *.zip ../"${RELEASE}"
+  cp "terragrunt-iac-engine-${NAME}_${TYPE}_${VERSION}_SHA256SUMS" ../"${RELEASE}"
+  cd "../${RELEASE}"
 }
 
 # Function to sign the SHA256SUMS file
