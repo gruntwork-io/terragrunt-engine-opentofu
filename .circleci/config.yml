@@ -239,7 +239,8 @@ jobs:
           command: |
             export TAG="${CIRCLE_TAG}"
             export VERSION=${TAG%-rc*}
-            sign-files --source-dir bin --out-dir release --name terragrunt-iac-engine-opentofu --version ${VERSION}
+            mkdir -p release
+            sign-files --source-dir $(pwd)/bin --out-dir $(pwd)/release --name terragrunt-iac-engine-opentofu --version ${VERSION}
             ls -lahrt bin/
             ls -lahrt release/
             #./.circleci/sign-files.sh
