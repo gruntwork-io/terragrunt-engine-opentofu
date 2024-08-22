@@ -310,8 +310,8 @@ workflows:
           filters:
             tags:
               only: /^.*-rc.*$/
-            branches:
-              ignore: /.*/
+#            branches:
+#              ignore: /.*/
           context:
             - AWS__PHXDEVOPS__circle-ci-test
             - GCP__automated-tests
