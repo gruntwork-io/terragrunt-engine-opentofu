@@ -237,14 +237,11 @@ jobs:
       - run:
           name: Package release files
           command: |
-            export TAG="${CIRCLE_TAG}"
-            export VERSION=${TAG%-rc*}
+            export RC_VERSION="${CIRCLE_TAG}"
+            export VERSION=${RC_VERSION%-rc*}
             mkdir -p release
             sign-files --source-dir $(pwd)/bin --out-dir $(pwd)/release --name terragrunt-iac-engine-opentofu --version ${VERSION}
-            ls -lahrt bin/
-            ls -lahrt release/
-            #./.circleci/sign-files.sh
-            #./.circleci/create-release.sh
+            create-release --repo-owner gruntwork-io --repo-name terragrunt-engine-opentofu --version ${VERSION} --rc-version ${RC_VERSION} --release-dir $(pwd)/release
       - persist_to_workspace:
           root: .
           paths: [release]
