@@ -11,8 +11,6 @@ env: &env
     MODULE_CI_VERSION: v0.57.0
     TERRATEST_LOG_PARSER_VERSION: v0.37.0
     GOLANG_VERSION: 1.21.1
-    # Configuration to clone repo
-    GOPRIVATE: "github.com/gruntwork-io/*"
 
 defaults: &defaults
   docker:
@@ -70,9 +68,6 @@ jobs:
   tests:
     <<: *defaults
     steps:
-      - add_ssh_keys:
-          fingerprints:
-            - "SHA256:R1U5ucEcu9pdl4mgfNo7kv7Lm6L4edvDSn9R3auqov4"
       - checkout
       - attach_workspace:
           at: /home/circleci
@@ -87,7 +82,6 @@ jobs:
       - run:
           name: Tidy check
           command: |
-            export GIT_SSH_COMMAND="ssh -i /home/circleci/.ssh/id_rsa_78a64a8391239adcd479c9be8b1903c7 -o IdentitiesOnly=yes"
             go mod tidy
       - run:
           name: Run lint
@@ -109,9 +103,6 @@ jobs:
   integration_tests:
     <<: *defaults
     steps:
-      - add_ssh_keys:
-          fingerprints:
-            - "SHA256:R1U5ucEcu9pdl4mgfNo7kv7Lm6L4edvDSn9R3auqov4"
       - checkout
       - attach_workspace:
           at: /home/circleci
@@ -126,7 +117,6 @@ jobs:
       - run:
           name: Tidy check
           command: |
-            export GIT_SSH_COMMAND="ssh -i /home/circleci/.ssh/id_rsa_78a64a8391239adcd479c9be8b1903c7 -o IdentitiesOnly=yes"
             go mod tidy
       - run:
           command: |
@@ -146,9 +136,6 @@ jobs:
       name: win/default
       size: "large"
     steps:
-      - add_ssh_keys:
-          fingerprints:
-            - "SHA256:R1U5ucEcu9pdl4mgfNo7kv7Lm6L4edvDSn9R3auqov4"
       - checkout
       - run:
           name: Install golang
@@ -163,8 +150,6 @@ jobs:
           shell: powershell.exe
           command: |
             # to save time, we're running the tests in one go
-            $env:GIT_SSH_COMMAND="ssh -i /home/circleci/.ssh/id_rsa_78a64a8391239adcd479c9be8b1903c7 -o IdentitiesOnly=yes"
-            echo $env:GIT_SSH_COMMAND
             
             go mod tidy
             go test -v ./...
@@ -173,14 +158,10 @@ jobs:
     resource_class: xlarge
     <<: *defaults
     steps:
-      - add_ssh_keys:
-          fingerprints:
-            - "SHA256:R1U5ucEcu9pdl4mgfNo7kv7Lm6L4edvDSn9R3auqov4"
       - checkout
       - run:
           <<: *install_gruntwork_utils
       - run: |
-          export GIT_SSH_COMMAND="ssh -i /home/circleci/.ssh/id_rsa_78a64a8391239adcd479c9be8b1903c7 -o IdentitiesOnly=yes"
           go mod tidy
           build-go-binaries --app-name terragrunt-iac-engine-opentofu --dest-path bin --ld-flags "-X github.com/gruntwork-io/go-commons/version.Version=$CIRCLE_TAG -extldflags '-static'"
       - persist_to_workspace:
