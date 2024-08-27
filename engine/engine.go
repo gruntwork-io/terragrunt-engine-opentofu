@@ -19,8 +19,9 @@ import (
 )
 
 const (
-	wgSize      = 2
-	TofuCommand = "tofu"
+	wgSize          = 2
+	iacCommand      = "tofu"
+	errorResultCode = 1
 )
 
 type TofuEngine struct {
@@ -43,7 +44,7 @@ func (c *TofuEngine) Init(req *tgengine.InitRequest, stream tgengine.Engine_Init
 
 func (c *TofuEngine) Run(req *tgengine.RunRequest, stream tgengine.Engine_RunServer) error {
 	log.Infof("Run Tofu plugin %v", req.WorkingDir)
-	cmd := exec.Command(TofuCommand, req.Args...)
+	cmd := exec.Command(iacCommand, req.Args...)
 	cmd.Dir = req.WorkingDir
 	env := make([]string, 0, len(req.EnvVars))
 	for key, value := range req.EnvVars {
@@ -53,10 +54,12 @@ func (c *TofuEngine) Run(req *tgengine.RunRequest, stream tgengine.Engine_RunSer
 
 	stdoutPipe, err := cmd.StdoutPipe()
 	if err != nil {
+		sendError(stream, err)
 		return err
 	}
 	stderrPipe, err := cmd.StderrPipe()
 	if err != nil {
+		sendError(stream, err)
 		return err
 	}
 
@@ -82,6 +85,7 @@ func (c *TofuEngine) Run(req *tgengine.RunRequest, stream tgengine.Engine_RunSer
 	}
 
 	if err := cmd.Start(); err != nil {
+		sendError(stream, err)
 		return err
 	}
 
@@ -103,10 +107,7 @@ func (c *TofuEngine) Run(req *tgengine.RunRequest, stream tgengine.Engine_RunSer
 				}
 				break
 			}
-			err = stream.Send(&tgengine.RunResponse{
-				Stdout: string(char),
-			})
-			if err != nil {
+			if err = stream.Send(&tgengine.RunResponse{Stdout: string(char)}); err != nil {
 				log.Errorf("Error sending stdout: %v", err)
 				return
 			}
@@ -126,10 +127,7 @@ func (c *TofuEngine) Run(req *tgengine.RunRequest, stream tgengine.Engine_RunSer
 				}
 				break
 			}
-			err = stream.Send(&tgengine.RunResponse{
-				Stderr: string(char),
-			})
-			if err != nil {
+			if err = stream.Send(&tgengine.RunResponse{Stderr: string(char)}); err != nil {
 				log.Errorf("Error sending stderr: %v", err)
 				return
 			}
@@ -145,21 +143,21 @@ func (c *TofuEngine) Run(req *tgengine.RunRequest, stream tgengine.Engine_RunSer
 			resultCode = 1
 		}
 	}
-
-	err = stream.Send(&tgengine.RunResponse{
-		ResultCode: int32(resultCode),
-	})
-	if err != nil {
+	if err := stream.Send(&tgengine.RunResponse{ResultCode: int32(resultCode)}); err != nil {
 		return err
 	}
 	return nil
 }
 
+func sendError(stream tgengine.Engine_RunServer, err error) {
+	if err = stream.Send(&tgengine.RunResponse{Stderr: fmt.Sprintf("%v", err), ResultCode: errorResultCode}); err != nil {
+		log.Warnf("Error sending response: %v", err)
+	}
+}
+
 func (c *TofuEngine) Shutdown(req *tgengine.ShutdownRequest, stream tgengine.Engine_ShutdownServer) error {
 	log.Info("Shutdown Tofu plugin")
-
-	err := stream.Send(&tgengine.ShutdownResponse{Stdout: "Tofu Shutdown completed\n", Stderr: "", ResultCode: 0})
-	if err != nil {
+	if err := stream.Send(&tgengine.ShutdownResponse{Stdout: "Tofu Shutdown completed\n", Stderr: "", ResultCode: 0}); err != nil {
 		return err
 	}
 	return nil
