@@ -2,8 +2,9 @@ package engine
 
 import (
 	"context"
-	"github.com/stretchr/testify/require"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 
 	"os"
 	"os/exec"
