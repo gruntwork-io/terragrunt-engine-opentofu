@@ -1,17 +1,17 @@
-package engine
+package engine_test
 
 import (
 	"context"
 	"testing"
 
-	"github.com/stretchr/testify/require"
-
 	"os"
 	"os/exec"
 
 	tgengine "github.com/gruntwork-io/terragrunt-engine-go/proto"
+	"github.com/gruntwork-io/terragrunt-engine-opentofu/engine"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/metadata"
 )
 
@@ -119,19 +119,19 @@ func (m *MockShutdownServer) RecvMsg(msg interface{}) error {
 
 func TestTofuEngine_Init(t *testing.T) {
 	t.Parallel()
-	engine := &TofuEngine{}
+	engine := &engine.TofuEngine{}
 	mockStream := &MockInitServer{}
 
 	err := engine.Init(&tgengine.InitRequest{}, mockStream)
 	require.NoError(t, err)
-	assert.Equal(t, 2, len(mockStream.Responses))
-	assert.Equal(t, "Tofu Initialization started\n", mockStream.Responses[0].Stdout)
-	assert.Equal(t, "Tofu Initialization completed\n", mockStream.Responses[1].Stdout)
+	assert.Len(t, mockStream.Responses, 2)
+	assert.Equal(t, "Tofu Initialization started\n", mockStream.Responses[0].GetStdout())
+	assert.Equal(t, "Tofu Initialization completed\n", mockStream.Responses[1].GetStdout())
 }
 
 func TestTofuEngine_Run(t *testing.T) {
 	t.Parallel()
-	engine := &TofuEngine{}
+	engine := &engine.TofuEngine{}
 	mockStream := &MockRunServer{}
 
 	cmd := "tofu"
@@ -143,20 +143,21 @@ func TestTofuEngine_Run(t *testing.T) {
 	}
 	err := engine.Run(req, mockStream)
 	require.NoError(t, err)
-	assert.True(t, len(mockStream.Responses) > 0)
+	assert.NotEmpty(t, mockStream.Responses)
 	// merge stdout from all responses to a string
 	var output string
 	for _, response := range mockStream.Responses {
-		if response.Stdout != "" {
-			output += response.Stdout
+		if response.GetStdout() != "" {
+			output += response.GetStdout()
 		}
 	}
+
 	assert.Contains(t, output, "Usage: tofu [global options] <subcommand> [args]")
 }
 
 func TestTofuEngineError(t *testing.T) {
 	t.Parallel()
-	engine := &TofuEngine{}
+	engine := &engine.TofuEngine{}
 	mockStream := &MockRunServer{}
 
 	cmd := "tofu"
@@ -167,30 +168,30 @@ func TestTofuEngineError(t *testing.T) {
 	}
 	err := engine.Run(req, mockStream)
 	require.NoError(t, err)
-	assert.True(t, len(mockStream.Responses) > 0)
+	assert.NotEmpty(t, mockStream.Responses)
 	// merge stdout from all responses to a string
 	var output string
 
 	for _, response := range mockStream.Responses {
-		if response.Stderr != "" {
-			output += response.Stderr
+		if response.GetStderr() != "" {
+			output += response.GetStderr()
 		}
 	}
 	// get status code from last response
-	code := mockStream.Responses[len(mockStream.Responses)-1].ResultCode
+	code := mockStream.Responses[len(mockStream.Responses)-1].GetResultCode()
 	assert.Contains(t, output, "OpenTofu has no command named \"not-a-valid-command\"")
 	assert.NotEqual(t, 0, code)
 }
 
 func TestTofuEngine_Shutdown(t *testing.T) {
 	t.Parallel()
-	engine := &TofuEngine{}
+	engine := &engine.TofuEngine{}
 	mockStream := &MockShutdownServer{}
 
 	err := engine.Shutdown(&tgengine.ShutdownRequest{}, mockStream)
 	require.NoError(t, err)
-	assert.Equal(t, 1, len(mockStream.Responses))
-	assert.Equal(t, "Tofu Shutdown completed\n", mockStream.Responses[0].Stdout)
+	assert.Len(t, mockStream.Responses, 1)
+	assert.Equal(t, "Tofu Shutdown completed\n", mockStream.Responses[0].GetStdout())
 }
 
 func TestHelperProcess(*testing.T) {

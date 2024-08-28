@@ -1,8 +1,10 @@
+// Package engine provides the implementation of Terragrunt IaC engine interface
 package engine
 
 import (
 	"bufio"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -30,6 +32,7 @@ type TofuEngine struct {
 
 func (c *TofuEngine) Init(req *tgengine.InitRequest, stream tgengine.Engine_InitServer) error {
 	log.Info("Init Tofu plugin")
+
 	err := stream.Send(&tgengine.InitResponse{Stdout: "Tofu Initialization started\n", Stderr: "", ResultCode: 0})
 	if err != nil {
 		return err
@@ -39,17 +42,20 @@ func (c *TofuEngine) Init(req *tgengine.InitRequest, stream tgengine.Engine_Init
 	if err != nil {
 		return err
 	}
+
 	return nil
 }
 
 func (c *TofuEngine) Run(req *tgengine.RunRequest, stream tgengine.Engine_RunServer) error {
-	log.Infof("Run Tofu plugin %v", req.WorkingDir)
-	cmd := exec.Command(iacCommand, req.Args...)
-	cmd.Dir = req.WorkingDir
-	env := make([]string, 0, len(req.EnvVars))
-	for key, value := range req.EnvVars {
+	log.Infof("Run Tofu plugin %v", req.GetWorkingDir())
+	cmd := exec.Command(iacCommand, req.GetArgs()...)
+	cmd.Dir = req.GetWorkingDir()
+
+	env := make([]string, 0, len(req.GetEnvVars()))
+	for key, value := range req.GetEnvVars() {
 		env = append(env, fmt.Sprintf("%s=%s", key, value))
 	}
+
 	cmd.Env = append(cmd.Env, env...)
 
 	stdoutPipe, err := cmd.StdoutPipe()
@@ -57,18 +63,20 @@ func (c *TofuEngine) Run(req *tgengine.RunRequest, stream tgengine.Engine_RunSer
 		sendError(stream, err)
 		return err
 	}
+
 	stderrPipe, err := cmd.StderrPipe()
 	if err != nil {
 		sendError(stream, err)
 		return err
 	}
 
-	if req.AllocatePseudoTty {
+	if req.GetAllocatePseudoTty() {
 		ptmx, err := pty.Start(cmd)
 		if err != nil {
 			log.Errorf("Error allocating pseudo-TTY: %v", err)
 			return err
 		}
+
 		defer func() { _ = ptmx.Close() }()
 
 		go func() {
@@ -97,16 +105,20 @@ func (c *TofuEngine) Run(req *tgengine.RunRequest, stream tgengine.Engine_RunSer
 	// Stream stdout
 	go func() {
 		defer wg.Done()
+
 		reader := transform.NewReader(stdoutPipe, unicode.UTF8.NewDecoder())
 		bufReader := bufio.NewReader(reader)
+
 		for {
 			char, _, err := bufReader.ReadRune()
 			if err != nil {
-				if err != io.EOF {
+				if !errors.Is(err, io.EOF) {
 					log.Errorf("Error reading stdout: %v", err)
 				}
+
 				break
 			}
+
 			if err = stream.Send(&tgengine.RunResponse{Stdout: string(char)}); err != nil {
 				log.Errorf("Error sending stdout: %v", err)
 				return
@@ -117,16 +129,20 @@ func (c *TofuEngine) Run(req *tgengine.RunRequest, stream tgengine.Engine_RunSer
 	// Stream stderr
 	go func() {
 		defer wg.Done()
+
 		reader := transform.NewReader(stderrPipe, unicode.UTF8.NewDecoder())
 		bufReader := bufio.NewReader(reader)
+
 		for {
 			char, _, err := bufReader.ReadRune()
 			if err != nil {
-				if err != io.EOF {
+				if !errors.Is(err, io.EOF) {
 					log.Errorf("Error reading stderr: %v", err)
 				}
+
 				break
 			}
+
 			if err = stream.Send(&tgengine.RunResponse{Stderr: string(char)}); err != nil {
 				log.Errorf("Error sending stderr: %v", err)
 				return
@@ -134,18 +150,23 @@ func (c *TofuEngine) Run(req *tgengine.RunRequest, stream tgengine.Engine_RunSer
 		}
 	}()
 	wg.Wait()
-	err = cmd.Wait()
+
 	resultCode := 0
+
+	err = cmd.Wait()
 	if err != nil {
-		if exitError, ok := err.(*exec.ExitError); ok {
+		var exitError *exec.ExitError
+		if ok := errors.As(err, &exitError); ok {
 			resultCode = exitError.ExitCode()
 		} else {
 			resultCode = 1
 		}
 	}
+
 	if err := stream.Send(&tgengine.RunResponse{ResultCode: int32(resultCode)}); err != nil {
 		return err
 	}
+
 	return nil
 }
 
@@ -157,9 +178,11 @@ func sendError(stream tgengine.Engine_RunServer, err error) {
 
 func (c *TofuEngine) Shutdown(req *tgengine.ShutdownRequest, stream tgengine.Engine_ShutdownServer) error {
 	log.Info("Shutdown Tofu plugin")
+
 	if err := stream.Send(&tgengine.ShutdownResponse{Stdout: "Tofu Shutdown completed\n", Stderr: "", ResultCode: 0}); err != nil {
 		return err
 	}
+
 	return nil
 }
 
