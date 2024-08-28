@@ -2,6 +2,7 @@ package engine
 
 import (
 	"context"
+	"github.com/stretchr/testify/require"
 	"testing"
 
 	"os"
@@ -121,7 +122,7 @@ func TestTofuEngine_Init(t *testing.T) {
 	mockStream := &MockInitServer{}
 
 	err := engine.Init(&tgengine.InitRequest{}, mockStream)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, 2, len(mockStream.Responses))
 	assert.Equal(t, "Tofu Initialization started\n", mockStream.Responses[0].Stdout)
 	assert.Equal(t, "Tofu Initialization completed\n", mockStream.Responses[1].Stdout)
@@ -140,7 +141,7 @@ func TestTofuEngine_Run(t *testing.T) {
 		EnvVars: map[string]string{"FOO": "bar"},
 	}
 	err := engine.Run(req, mockStream)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.True(t, len(mockStream.Responses) > 0)
 	// merge stdout from all responses to a string
 	var output string
@@ -164,7 +165,7 @@ func TestTofuEngineError(t *testing.T) {
 		Args:    args,
 	}
 	err := engine.Run(req, mockStream)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.True(t, len(mockStream.Responses) > 0)
 	// merge stdout from all responses to a string
 	var output string
@@ -186,7 +187,7 @@ func TestTofuEngine_Shutdown(t *testing.T) {
 	mockStream := &MockShutdownServer{}
 
 	err := engine.Shutdown(&tgengine.ShutdownRequest{}, mockStream)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, 1, len(mockStream.Responses))
 	assert.Equal(t, "Tofu Shutdown completed\n", mockStream.Responses[0].Stdout)
 }
