@@ -4,6 +4,8 @@ import (
 	"context"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"os"
 	"os/exec"
 
@@ -116,17 +118,19 @@ func (m *MockShutdownServer) RecvMsg(msg interface{}) error {
 }
 
 func TestTofuEngine_Init(t *testing.T) {
+	t.Parallel()
 	engine := &TofuEngine{}
 	mockStream := &MockInitServer{}
 
 	err := engine.Init(&tgengine.InitRequest{}, mockStream)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, 2, len(mockStream.Responses))
 	assert.Equal(t, "Tofu Initialization started\n", mockStream.Responses[0].Stdout)
 	assert.Equal(t, "Tofu Initialization completed\n", mockStream.Responses[1].Stdout)
 }
 
 func TestTofuEngine_Run(t *testing.T) {
+	t.Parallel()
 	engine := &TofuEngine{}
 	mockStream := &MockRunServer{}
 
@@ -138,7 +142,7 @@ func TestTofuEngine_Run(t *testing.T) {
 		EnvVars: map[string]string{"FOO": "bar"},
 	}
 	err := engine.Run(req, mockStream)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.True(t, len(mockStream.Responses) > 0)
 	// merge stdout from all responses to a string
 	var output string
@@ -150,12 +154,41 @@ func TestTofuEngine_Run(t *testing.T) {
 	assert.Contains(t, output, "Usage: tofu [global options] <subcommand> [args]")
 }
 
+func TestTofuEngineError(t *testing.T) {
+	t.Parallel()
+	engine := &TofuEngine{}
+	mockStream := &MockRunServer{}
+
+	cmd := "tofu"
+	args := []string{"not-a-valid-command"}
+	req := &tgengine.RunRequest{
+		Command: cmd,
+		Args:    args,
+	}
+	err := engine.Run(req, mockStream)
+	require.NoError(t, err)
+	assert.True(t, len(mockStream.Responses) > 0)
+	// merge stdout from all responses to a string
+	var output string
+
+	for _, response := range mockStream.Responses {
+		if response.Stderr != "" {
+			output += response.Stderr
+		}
+	}
+	// get status code from last response
+	code := mockStream.Responses[len(mockStream.Responses)-1].ResultCode
+	assert.Contains(t, output, "OpenTofu has no command named \"not-a-valid-command\"")
+	assert.NotEqual(t, 0, code)
+}
+
 func TestTofuEngine_Shutdown(t *testing.T) {
+	t.Parallel()
 	engine := &TofuEngine{}
 	mockStream := &MockShutdownServer{}
 
 	err := engine.Shutdown(&tgengine.ShutdownRequest{}, mockStream)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, 1, len(mockStream.Responses))
 	assert.Equal(t, "Tofu Shutdown completed\n", mockStream.Responses[0].Stdout)
 }
