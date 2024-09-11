@@ -14,6 +14,26 @@ We hope that this engine will inspire you to experiment and create your own IAC 
 
 For more information, see the [Terragrunt IAC Engine RFC](https://github.com/gruntwork-io/terragrunt/issues/3103).
 
+## Usage
+
+To utilize the OpenTofu Engine in your Terragrunt configuration, you need to specify the `engine` in HCL code.
+Here's an example:
+
+```hcl
+engine {
+  source  = "github.com/gruntwork-io/terragrunt-engine-opentofu"
+  // Specify a fixed version if you require stable behavior
+  // and want to avoid using the latest changes.
+  // version = "v0.0.6"
+}
+```
+
+Make sure to set the required environment variable to enable the experimental engine feature:
+
+```bash
+export TG_EXPERIMENTAL_ENGINE=1
+```
+
 ## Automated Release Process
 
 To initiate the release process, create a pre-release named using the following naming convention: `vx.y.z-rcdateincrement`, with the appropriate corresponding tag.
