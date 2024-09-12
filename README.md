@@ -23,7 +23,6 @@ Here's an example:
 engine {
   source  = "github.com/gruntwork-io/terragrunt-engine-opentofu"
   // Specify a fixed version if you require stable behavior
-  // and want to avoid using the latest changes.
   // version = "v0.0.6"
 }
 ```
