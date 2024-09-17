@@ -22,7 +22,8 @@ Here's an example:
 ```hcl
 engine {
   source  = "github.com/gruntwork-io/terragrunt-engine-opentofu"
-  // Specify a fixed version if you require stable behavior
+  // Specify a fixed version if you want to pin a specific engine version instead of always
+  // using the latest version of the engine.
   // version = "v0.0.6"
 }
 ```
