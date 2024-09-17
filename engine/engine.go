@@ -153,8 +153,7 @@ func (c *TofuEngine) Run(req *tgengine.RunRequest, stream tgengine.Engine_RunSer
 
 	resultCode := 0
 
-	err = cmd.Wait()
-	if err != nil {
+	if err := cmd.Wait(); err != nil {
 		var exitError *exec.ExitError
 		if ok := errors.As(err, &exitError); ok {
 			resultCode = exitError.ExitCode()
