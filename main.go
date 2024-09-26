@@ -21,11 +21,13 @@ func main() {
 	if engineLogLevel == "" {
 		engineLogLevel = defaultEngineLogLevel
 	}
+
 	parsedLevel, err := logrus.ParseLevel(engineLogLevel)
 	if err != nil {
 		logrus.Warnf("Error parsing log level: %v", err)
 		parsedLevel = logrus.InfoLevel
 	}
+
 	logrus.SetLevel(parsedLevel)
 
 	logger := hclog.NewInterceptLogger(&hclog.LoggerOptions{
