@@ -1,11 +1,12 @@
 package main
 
 import (
+	"os"
+
 	tgengine "github.com/gruntwork-io/terragrunt-engine-go/engine"
 	"github.com/gruntwork-io/terragrunt-engine-opentofu/engine"
 	"github.com/hashicorp/go-hclog"
 	"github.com/sirupsen/logrus"
-	"os"
 
 	"github.com/hashicorp/go-plugin"
 )
