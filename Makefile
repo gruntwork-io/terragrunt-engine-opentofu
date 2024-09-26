@@ -13,11 +13,11 @@ clean:
 
 lint: SHELL:=/bin/bash
 lint:
-	golangci-lint run -c <(curl -s https://raw.githubusercontent.com/gruntwork-io/terragrunt/master/.golangci.yml) ./...
+	golangci-lint run -c <(curl -s https://raw.githubusercontent.com/gruntwork-io/terragrunt/main/.golangci.yml) ./...
 
 update-local-lint: SHELL:=/bin/bash
 update-local-lint:
-	curl -s https://raw.githubusercontent.com/gruntwork-io/terragrunt/master/.golangci.yml --output .golangci.yml
+	curl -s https://raw.githubusercontent.com/gruntwork-io/terragrunt/main/.golangci.yml --output .golangci.yml
 	tmpfile=$$(mktemp) ;\
 	echo '# This file is generated using `make update-local-lint` to track the linting used in Terragrunt. Do not edit manually.' | cat - .golangci.yml > $${tmpfile} && mv $${tmpfile} .golangci.yml
 
