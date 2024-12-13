@@ -8,7 +8,7 @@ if (Test-Path -Path $OpenTofuInstallPath)
 	Remove-Item $OpenTofuInstallPath -Recurse
 }
 # Download OpenTofu and unpack it
-$OpenTofuURI = "https://github.com/opentofu/opentofu/releases/download/v1.7.0/tofu_1.7.0_windows_amd64.zip"
+$OpenTofuURI = "https://github.com/opentofu/opentofu/releases/download/v1.8.7/tofu_1.8.7_windows_amd64.zip"
 $output = "tofu_1.7.0_windows_amd64.zip"
 $ProgressPreference = "SilentlyContinue"
 Invoke-WebRequest -Uri $OpenTofuURI -OutFile $output
