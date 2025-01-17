@@ -11,9 +11,9 @@ import (
 	"os/exec"
 	"sync"
 
+	"github.com/creack/pty"
 	tgengine "github.com/gruntwork-io/terragrunt-engine-go/proto"
 	"github.com/hashicorp/go-plugin"
-	"github.com/kr/pty"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/text/encoding/unicode"
 	"golang.org/x/text/transform"
