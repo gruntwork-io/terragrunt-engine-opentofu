@@ -11,7 +11,7 @@ require (
 	github.com/hashicorp/go-plugin v1.6.3
 	github.com/sirupsen/logrus v1.9.3
 	github.com/stretchr/testify v1.10.0
-	golang.org/x/text v0.21.0
+	golang.org/x/text v0.22.0
 	google.golang.org/grpc v1.70.0
 )
 
