@@ -25,7 +25,7 @@ test:
 	go test -v ./...
 
 tools:
-	go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.63.4
+	go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.64.6
 
 fmt:
 	@echo "Running source files through gofmt..."
