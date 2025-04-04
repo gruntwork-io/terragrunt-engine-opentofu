@@ -2,8 +2,6 @@ module github.com/gruntwork-io/terragrunt-engine-opentofu
 
 go 1.23.0
 
-toolchain go1.24.1
-
 require (
 	github.com/creack/pty v1.1.24
 	github.com/gruntwork-io/terragrunt-engine-go v0.0.13
