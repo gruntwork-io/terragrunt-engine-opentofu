@@ -11,6 +11,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"sync"
 	"time"
 
@@ -93,9 +94,27 @@ func getDefaultCacheDir() (string, error) {
 		return "", fmt.Errorf("failed to get user home directory: %w", err)
 	}
 
-	cacheDir := filepath.Join(homeDir, ".cache", "terragrunt", "tofudl")
+	cacheDir := filepath.Join(homeDir, ".cache", "terragrunt", "tofudl", "cache")
 
 	return cacheDir, nil
+}
+
+// getDefaultBinDir returns the default binary directory for a specific version
+func getDefaultBinDir(version string) (string, error) {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return "", fmt.Errorf("failed to get user home directory: %w", err)
+	}
+
+	binDir := filepath.Join(homeDir, ".cache", "terragrunt", "tofudl", "bin", version)
+
+	return binDir, nil
+}
+
+// normalizeVersion strips the leading 'v' from version strings if present
+// This is needed because tofudl expects versions without the 'v' prefix
+func normalizeVersion(version string) string {
+	return strings.TrimPrefix(version, "v")
 }
 
 // downloadOpenTofu downloads the OpenTofu binary and returns the path to it
@@ -138,9 +157,10 @@ func (c *TofuEngine) downloadOpenTofu(version, installDir string) (string, error
 
 		log.Debug("Downloading latest stable OpenTofu version")
 	} else {
-		opts = append(opts, tofudl.DownloadOptVersion(tofudl.Version(version)))
-
-		log.Debugf("Downloading OpenTofu version: %s", version)
+		// Strip 'v' prefix from version for tofudl compatibility
+		normalizedVersion := normalizeVersion(version)
+		opts = append(opts, tofudl.DownloadOptVersion(tofudl.Version(normalizedVersion)))
+		log.Debugf("Downloading OpenTofu version: %s (normalized: %s)", version, normalizedVersion)
 	}
 
 	ctx := context.Background()
@@ -150,8 +170,14 @@ func (c *TofuEngine) downloadOpenTofu(version, installDir string) (string, error
 		return "", fmt.Errorf("failed to download OpenTofu binary: %w", err)
 	}
 
+	// Use versioned bin directory if installDir not specified
 	if installDir == "" {
-		installDir = os.TempDir()
+		installDir, err = getDefaultBinDir(version)
+		if err != nil {
+			log.Warnf("Failed to get default bin directory, falling back to temp: %v", err)
+
+			installDir = os.TempDir()
+		}
 	}
 
 	if err := os.MkdirAll(installDir, installDirMode); err != nil {
