@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/creack/pty"
+	"github.com/gofrs/flock"
 	tgengine "github.com/gruntwork-io/terragrunt-engine-go/proto"
 	"github.com/hashicorp/go-plugin"
 	"github.com/opentofu/tofudl"
@@ -34,11 +35,30 @@ const (
 
 type TofuEngine struct {
 	tgengine.UnimplementedEngineServer
+	mu         sync.RWMutex
 	binaryPath string
+}
+
+// setBinaryPath safely sets the binary path
+func (c *TofuEngine) setBinaryPath(path string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.binaryPath = path
+}
+
+// getBinaryPath safely gets the binary path
+func (c *TofuEngine) getBinaryPath() string {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.binaryPath
 }
 
 func (c *TofuEngine) Init(req *tgengine.InitRequest, stream tgengine.Engine_InitServer) error {
 	log.Info("Init Tofu plugin")
+
+	if err := stream.Send(&tgengine.InitResponse{Stdout: "Tofu Initialization started\n"}); err != nil {
+		return err
+	}
 
 	version := ""
 	installDir := ""
@@ -67,16 +87,20 @@ func (c *TofuEngine) Init(req *tgengine.InitRequest, stream tgengine.Engine_Init
 			return downloadErr
 		}
 
-		c.binaryPath = binaryPath
+		c.setBinaryPath(binaryPath)
 
 		log.Debugf("OpenTofu binary downloaded to: %s\n", binaryPath)
 	} else {
-		c.binaryPath = iacCommand
+		c.setBinaryPath(iacCommand)
 
 		log.Debug("Using system OpenTofu binary (no version specified)")
 	}
 
 	log.Info("Engine Initialization completed")
+
+	if err := stream.Send(&tgengine.InitResponse{Stdout: "Tofu Initialization completed\n"}); err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -117,8 +141,80 @@ func normalizeVersion(version string) string {
 	return strings.TrimPrefix(version, "v")
 }
 
+// getDefaultLockDir returns the default lock directory for file locking
+func getDefaultLockDir() (string, error) {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return "", fmt.Errorf("failed to get user home directory: %w", err)
+	}
+
+	lockDir := filepath.Join(homeDir, ".cache", "terragrunt", "tofudl", "locks")
+
+	if err := os.MkdirAll(lockDir, installDirMode); err != nil {
+		return "", fmt.Errorf("failed to create lock directory: %w", err)
+	}
+
+	return lockDir, nil
+}
+
+// getLockFilePath returns the lock file path for a specific version
+func getLockFilePath() (string, error) {
+	lockDir, err := getDefaultLockDir()
+	if err != nil {
+		return "", err
+	}
+
+	// Use a single global lock file to prevent tofudl library race conditions
+	// The race condition occurs in tofudl.New() which affects a global config,
+	// so we need to serialize all downloads regardless of version
+	lockFileName := "global-download.lock"
+	return filepath.Join(lockDir, lockFileName), nil
+}
+
 // downloadOpenTofu downloads the OpenTofu binary and returns the path to it
 func (c *TofuEngine) downloadOpenTofu(version, installDir string) (string, error) {
+	lockFilePath, err := getLockFilePath()
+	if err != nil {
+		log.Warnf("Failed to get lock file path, continuing without locking: %v", err)
+		return c.downloadOpenTofuUnsafe(version, installDir)
+	}
+
+	fileLock := flock.New(lockFilePath)
+
+	log.Debugf("Acquiring download lock for OpenTofu version %s: %s", version, lockFilePath)
+
+	locked, err := fileLock.TryLock()
+	if err != nil {
+		log.Warnf("Failed to acquire download lock, continuing without locking: %v", err)
+		return c.downloadOpenTofuUnsafe(version, installDir)
+	}
+
+	if !locked {
+		log.Debug("Download lock is held by another process, waiting...")
+
+		err = fileLock.Lock()
+		if err != nil {
+			log.Warnf("Failed to acquire blocking download lock, continuing without locking: %v", err)
+			return c.downloadOpenTofuUnsafe(version, installDir)
+		}
+	}
+
+	log.Debugf("Acquired download lock for OpenTofu version %s", version)
+
+	defer func() {
+		if unlockErr := fileLock.Unlock(); unlockErr != nil {
+			log.Warnf("Failed to release download lock: %v", unlockErr)
+		} else {
+			log.Debugf("Released download lock for OpenTofu version %s", version)
+		}
+	}()
+
+	return c.downloadOpenTofuUnsafe(version, installDir)
+}
+
+// downloadOpenTofuUnsafe performs the actual download without locking
+// This is separated to allow fallback when locking fails
+func (c *TofuEngine) downloadOpenTofuUnsafe(version, installDir string) (string, error) {
 	dl, err := tofudl.New()
 	if err != nil {
 		return "", fmt.Errorf("failed to create downloader: %w", err)
@@ -157,7 +253,6 @@ func (c *TofuEngine) downloadOpenTofu(version, installDir string) (string, error
 
 		log.Debug("Downloading latest stable OpenTofu version")
 	} else {
-		// Strip 'v' prefix from version for tofudl compatibility
 		normalizedVersion := normalizeVersion(version)
 		opts = append(opts, tofudl.DownloadOptVersion(tofudl.Version(normalizedVersion)))
 		log.Debugf("Downloading OpenTofu version: %s (normalized: %s)", version, normalizedVersion)
@@ -191,6 +286,11 @@ func (c *TofuEngine) downloadOpenTofu(version, installDir string) (string, error
 
 	binaryPath := filepath.Join(installDir, binaryName)
 
+	if info, err := os.Stat(binaryPath); err == nil && info.Size() > 0 {
+		log.Debugf("OpenTofu binary already exists at: %s", binaryPath)
+		return binaryPath, nil
+	}
+
 	if err := os.WriteFile(binaryPath, binary, installDirMode); err != nil {
 		return "", fmt.Errorf("failed to write OpenTofu binary: %w", err)
 	}
@@ -203,7 +303,7 @@ func (c *TofuEngine) downloadOpenTofu(version, installDir string) (string, error
 func (c *TofuEngine) Run(req *tgengine.RunRequest, stream tgengine.Engine_RunServer) error {
 	log.Infof("Run Tofu plugin %v", req.GetWorkingDir())
 
-	cmdPath := c.binaryPath
+	cmdPath := c.getBinaryPath()
 	if cmdPath == "" {
 		cmdPath = iacCommand
 	}
