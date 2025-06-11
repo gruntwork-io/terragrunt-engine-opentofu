@@ -9,11 +9,15 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
+	"runtime"
 	"sync"
+	"time"
 
 	"github.com/creack/pty"
 	tgengine "github.com/gruntwork-io/terragrunt-engine-go/proto"
 	"github.com/hashicorp/go-plugin"
+	"github.com/opentofu/tofudl"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/text/encoding/unicode"
 	"golang.org/x/text/transform"
@@ -24,31 +28,144 @@ const (
 	wgSize          = 2
 	iacCommand      = "tofu"
 	errorResultCode = 1
+	installDirMode  = 0755
 )
 
 type TofuEngine struct {
 	tgengine.UnimplementedEngineServer
+	binaryPath string
 }
 
 func (c *TofuEngine) Init(req *tgengine.InitRequest, stream tgengine.Engine_InitServer) error {
 	log.Info("Init Tofu plugin")
 
-	err := stream.Send(&tgengine.InitResponse{Stdout: "Tofu Initialization started\n", Stderr: "", ResultCode: 0})
-	if err != nil {
-		return err
+	version := ""
+	installDir := ""
+
+	if req.GetMeta() != nil {
+		if versionAny, exists := req.GetMeta()["tofu_version"]; exists {
+			if stringValue := versionAny.GetValue(); stringValue != nil {
+				version = string(stringValue)
+			}
+		}
+
+		if installDirAny, exists := req.GetMeta()["tofu_install_dir"]; exists {
+			if stringValue := installDirAny.GetValue(); stringValue != nil {
+				installDir = string(stringValue)
+			}
+		}
 	}
 
-	err = stream.Send(&tgengine.InitResponse{Stdout: "Tofu Initialization completed\n", Stderr: "", ResultCode: 0})
-	if err != nil {
-		return err
+	if version != "" {
+		log.Debugf("Downloading OpenTofu binary (version: %s)...", version)
+
+		binaryPath, downloadErr := c.downloadOpenTofu(version, installDir)
+		if downloadErr != nil {
+			log.Errorf("Failed to download OpenTofu: %v\n", downloadErr)
+
+			return downloadErr
+		}
+
+		c.binaryPath = binaryPath
+
+		log.Debugf("OpenTofu binary downloaded to: %s\n", binaryPath)
+	} else {
+		c.binaryPath = iacCommand
+
+		log.Debug("Using system OpenTofu binary (no version specified)")
 	}
+
+	log.Info("Engine Initialization completed")
 
 	return nil
 }
 
+const (
+	cacheDir             = "tofudl-cache"
+	cacheTimeout         = time.Minute * 10
+	artifactCacheTimeout = time.Hour * 24
+)
+
+// downloadOpenTofu downloads the OpenTofu binary and returns the path to it
+func (c *TofuEngine) downloadOpenTofu(version, installDir string) (string, error) {
+	dl, err := tofudl.New()
+	if err != nil {
+		return "", fmt.Errorf("failed to create downloader: %w", err)
+	}
+
+	cacheDir := filepath.Join(os.TempDir(), cacheDir)
+
+	storage, err := tofudl.NewFilesystemStorage(cacheDir)
+	if err != nil {
+		return "", fmt.Errorf("failed to create filesystem storage: %w", err)
+	}
+
+	mirror, err := tofudl.NewMirror(
+		tofudl.MirrorConfig{
+			AllowStale:           true,
+			APICacheTimeout:      cacheTimeout,
+			ArtifactCacheTimeout: artifactCacheTimeout,
+		},
+		storage,
+		dl,
+	)
+	if err != nil {
+		return "", fmt.Errorf("failed to create mirror: %w", err)
+	}
+
+	var opts []tofudl.DownloadOpt
+
+	// Handle "latest" version using stability option, otherwise use specific version
+	if version == "latest" {
+		opts = append(opts, tofudl.DownloadOptMinimumStability(tofudl.StabilityStable))
+
+		log.Debug("Downloading latest stable OpenTofu version")
+	} else {
+		opts = append(opts, tofudl.DownloadOptVersion(tofudl.Version(version)))
+
+		log.Debugf("Downloading OpenTofu version: %s", version)
+	}
+
+	ctx := context.Background()
+
+	binary, err := mirror.Download(ctx, opts...)
+	if err != nil {
+		return "", fmt.Errorf("failed to download OpenTofu binary: %w", err)
+	}
+
+	if installDir == "" {
+		installDir = os.TempDir()
+	}
+
+	if err := os.MkdirAll(installDir, installDirMode); err != nil {
+		return "", fmt.Errorf("failed to create install directory: %w", err)
+	}
+
+	binaryName := "tofu"
+	if runtime.GOOS == "windows" {
+		binaryName += ".exe"
+	}
+
+	binaryPath := filepath.Join(installDir, binaryName)
+
+	if err := os.WriteFile(binaryPath, binary, installDirMode); err != nil {
+		return "", fmt.Errorf("failed to write OpenTofu binary: %w", err)
+	}
+
+	log.Debugf("OpenTofu binary cached and installed to: %s", binaryPath)
+
+	return binaryPath, nil
+}
+
 func (c *TofuEngine) Run(req *tgengine.RunRequest, stream tgengine.Engine_RunServer) error {
 	log.Infof("Run Tofu plugin %v", req.GetWorkingDir())
-	cmd := exec.Command(iacCommand, req.GetArgs()...)
+
+	cmdPath := c.binaryPath
+	if cmdPath == "" {
+		cmdPath = iacCommand
+	}
+
+	cmd := exec.Command(cmdPath, req.GetArgs()...)
 	cmd.Dir = req.GetWorkingDir()
 
 	env := make([]string, 0, len(req.GetEnvVars()))
