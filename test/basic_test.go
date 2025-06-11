@@ -14,6 +14,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/test/bufconn"
 	"google.golang.org/protobuf/types/known/anypb"
 )
@@ -173,10 +174,7 @@ func bufDialer(context.Context, string) (net.Conn, error) {
 func runTofuCommand(t *testing.T, ctx context.Context, command string, args []string, workingDir string, envVars map[string]string) (string, string, error) {
 	t.Helper()
 
-	// TODO: Update the deprecated usage of DialContext and WithInsecure below
-
-	// nolint:staticcheck
-	conn, err := grpc.DialContext(ctx, "", grpc.WithContextDialer(bufDialer), grpc.WithInsecure())
+	conn, err := grpc.NewClient("passthrough://bufnet", grpc.WithContextDialer(bufDialer), grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		return "", "", err
 	}
@@ -225,10 +223,7 @@ func runTofuCommand(t *testing.T, ctx context.Context, command string, args []st
 func runTofuCommandWithInit(t *testing.T, ctx context.Context, command string, args []string, workingDir string, envVars map[string]string, meta map[string]*anypb.Any) (string, string, error) {
 	t.Helper()
 
-	// TODO: Update the deprecated usage of DialContext and WithInsecure below
-
-	// nolint:staticcheck
-	conn, err := grpc.DialContext(ctx, "", grpc.WithContextDialer(bufDialer), grpc.WithInsecure())
+	conn, err := grpc.NewClient("passthrough://bufnet", grpc.WithContextDialer(bufDialer), grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		return "", "", err
 	}
