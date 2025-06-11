@@ -35,8 +35,8 @@ const (
 
 type TofuEngine struct {
 	tgengine.UnimplementedEngineServer
-	mu         sync.RWMutex
 	binaryPath string
+	mu         sync.RWMutex
 }
 
 // setBinaryPath safely sets the binary path
@@ -50,6 +50,7 @@ func (c *TofuEngine) setBinaryPath(path string) {
 func (c *TofuEngine) getBinaryPath() string {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
+
 	return c.binaryPath
 }
 
@@ -168,6 +169,7 @@ func getLockFilePath() (string, error) {
 	// The race condition occurs in tofudl.New() which affects a global config,
 	// so we need to serialize all downloads regardless of version
 	lockFileName := "global-download.lock"
+
 	return filepath.Join(lockDir, lockFileName), nil
 }
 
