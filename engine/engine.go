@@ -86,6 +86,18 @@ const (
 	artifactCacheTimeout = time.Hour * 24
 )
 
+// getDefaultCacheDir returns the default cache directory following Terragrunt's pattern
+func getDefaultCacheDir() (string, error) {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return "", fmt.Errorf("failed to get user home directory: %w", err)
+	}
+
+	cacheDir := filepath.Join(homeDir, ".cache", "terragrunt", "tofudl")
+
+	return cacheDir, nil
+}
+
 // downloadOpenTofu downloads the OpenTofu binary and returns the path to it
 func (c *TofuEngine) downloadOpenTofu(version, installDir string) (string, error) {
 	dl, err := tofudl.New()
@@ -93,7 +105,12 @@ func (c *TofuEngine) downloadOpenTofu(version, installDir string) (string, error
 		return "", fmt.Errorf("failed to create downloader: %w", err)
 	}
 
-	cacheDir := filepath.Join(os.TempDir(), cacheDir)
+	cacheDir, err := getDefaultCacheDir()
+	if err != nil {
+		log.Warnf("Failed to get default cache directory, falling back to temp: %v", err)
+
+		cacheDir = filepath.Join(os.TempDir(), "tofudl-cache")
+	}
 
 	storage, err := tofudl.NewFilesystemStorage(cacheDir)
 	if err != nil {
