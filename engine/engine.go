@@ -107,7 +107,6 @@ func (c *TofuEngine) Init(req *tgengine.InitRequest, stream tgengine.Engine_Init
 }
 
 const (
-	cacheDir             = "tofudl-cache"
 	cacheTimeout         = time.Minute * 10
 	artifactCacheTimeout = time.Hour * 24
 )
