@@ -2,6 +2,7 @@ package integration_test
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"os"
@@ -90,6 +91,24 @@ func TestAutoInstallExplicitVersion(t *testing.T) {
 	require.Empty(t, stderr)
 	// Verify that the correct version was downloaded and used
 	assert.Contains(t, stdout, "OpenTofu v1.9.1")
+}
+
+func TestAutoInstallInvalidVersion(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+
+	version := "v0.0.0"
+	versionAny, err := createStringAny(version)
+	require.NoError(t, err)
+
+	meta := map[string]*anypb.Any{
+		"tofu_version": versionAny,
+	}
+
+	_, _, err = runTofuCommandWithInit(t, ctx, "tofu", []string{"version"}, "fixture-basic-project", map[string]string{}, meta)
+	require.ErrorIs(t, err, ErrFailedToInitialize)
+
+	assert.Contains(t, err.Error(), "failed to download OpenTofu: No such version: 0.0.0")
 }
 
 func TestAutoInstallLatestVersion(t *testing.T) {
@@ -220,6 +239,8 @@ func runTofuCommand(t *testing.T, ctx context.Context, command string, args []st
 	return stdout.String(), stderr.String(), nil
 }
 
+var ErrFailedToInitialize = errors.New("failed to initialize")
+
 func runTofuCommandWithInit(t *testing.T, ctx context.Context, command string, args []string, workingDir string, envVars map[string]string, meta map[string]*anypb.Any) (string, string, error) {
 	t.Helper()
 
@@ -244,9 +265,13 @@ func runTofuCommandWithInit(t *testing.T, ctx context.Context, command string, a
 
 	// Read init response (if any)
 	for {
-		_, err := initStream.Recv()
+		res, err := initStream.Recv()
 		if err != nil {
 			break
+		}
+
+		if res.GetResultCode() != 0 {
+			return "", "", fmt.Errorf("%w: %s", ErrFailedToInitialize, res.GetStderr())
 		}
 	}
 

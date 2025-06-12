@@ -85,6 +85,15 @@ func (c *TofuEngine) Init(req *tgengine.InitRequest, stream tgengine.Engine_Init
 		if downloadErr != nil {
 			log.Errorf("Failed to download OpenTofu: %v\n", downloadErr)
 
+			if err := stream.Send(
+				&tgengine.InitResponse{
+					Stderr:     fmt.Sprintf("Failed to download OpenTofu: %v\n", downloadErr),
+					ResultCode: errorResultCode,
+				},
+			); err != nil {
+				return err
+			}
+
 			return downloadErr
 		}
 
@@ -213,6 +222,8 @@ func (c *TofuEngine) downloadOpenTofu(version, installDir string) (string, error
 	return c.downloadOpenTofuUnsafe(version, installDir)
 }
 
+var ErrFailedToDownload = errors.New("failed to download OpenTofu")
+
 // downloadOpenTofuUnsafe performs the actual download without locking
 // This is separated to allow fallback when locking fails
 func (c *TofuEngine) downloadOpenTofuUnsafe(version, installDir string) (string, error) {
@@ -263,7 +274,7 @@ func (c *TofuEngine) downloadOpenTofuUnsafe(version, installDir string) (string,
 
 	binary, err := mirror.Download(ctx, opts...)
 	if err != nil {
-		return "", fmt.Errorf("failed to download OpenTofu binary: %w", err)
+		return "", fmt.Errorf("%w: %v", ErrFailedToDownload, err)
 	}
 
 	// Use versioned bin directory if installDir not specified
