@@ -87,7 +87,7 @@ func (c *TofuEngine) Init(req *tgengine.InitRequest, stream tgengine.Engine_Init
 
 			if err := stream.Send(
 				&tgengine.InitResponse{
-					Stderr:     fmt.Sprintf("Failed to download OpenTofu: %v\n", downloadErr),
+					Stderr:     downloadErr.Error(),
 					ResultCode: errorResultCode,
 				},
 			); err != nil {
