@@ -274,7 +274,7 @@ func (c *TofuEngine) downloadOpenTofuUnsafe(version, installDir string) (string,
 
 	binary, err := mirror.Download(ctx, opts...)
 	if err != nil {
-		return "", fmt.Errorf("%w: %v", ErrFailedToDownload, err)
+		return "", fmt.Errorf("%w: %w", ErrFailedToDownload, err)
 	}
 
 	// Use versioned bin directory if installDir not specified

@@ -45,7 +45,7 @@ func createStringAny(value string) (*anypb.Any, error) {
 
 func TestRun(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
+	ctx := t.Context()
 
 	stdout, stderr, err := runTofuCommand(t, ctx, "tofu", []string{"init"}, "fixture-basic-project", map[string]string{})
 	require.NoError(t, err)
@@ -57,7 +57,7 @@ func TestRun(t *testing.T) {
 
 func TestVarPassing(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
+	ctx := t.Context()
 
 	_, _, err := runTofuCommand(t, ctx, "tofu", []string{"init"}, "fixture-variables", map[string]string{})
 	require.NoError(t, err)
@@ -73,7 +73,7 @@ func TestVarPassing(t *testing.T) {
 
 func TestAutoInstallExplicitVersion(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Test with explicit version v1.9.1
 	version := "v1.9.1"
@@ -95,7 +95,7 @@ func TestAutoInstallExplicitVersion(t *testing.T) {
 
 func TestAutoInstallInvalidVersion(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
+	ctx := t.Context()
 
 	version := "v0.0.0"
 	versionAny, err := createStringAny(version)
@@ -113,7 +113,7 @@ func TestAutoInstallInvalidVersion(t *testing.T) {
 
 func TestAutoInstallLatestVersion(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Test with "latest" version
 	versionAny, err := createStringAny("latest")
@@ -134,7 +134,7 @@ func TestAutoInstallLatestVersion(t *testing.T) {
 
 func TestNoAutoInstallWithoutVersion(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Test without specifying version (should use system binary)
 	meta := map[string]*anypb.Any{}
@@ -155,7 +155,7 @@ func TestNoAutoInstallWithoutVersion(t *testing.T) {
 
 func TestAutoInstallWithCustomInstallDir(t *testing.T) {
 	t.Parallel()
-	ctx := context.Background()
+	ctx := t.Context()
 
 	// Test with explicit version and custom install directory
 	version := "v1.9.1"
