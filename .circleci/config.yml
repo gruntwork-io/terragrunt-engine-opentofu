@@ -10,12 +10,12 @@ env: &env
     GRUNTWORK_INSTALLER_VERSION: v0.0.40
     MODULE_CI_VERSION: v0.58.1
     TERRATEST_LOG_PARSER_VERSION: v0.37.0
-    GOLANG_VERSION: 1.23.1
+    GOLANG_VERSION: 1.24.4
     TOFU_VERSION: 1.9.0
 
 defaults: &defaults
   docker:
-    - image: 087285199408.dkr.ecr.us-east-1.amazonaws.com/circle-ci-test-image-base:go1.23.1-tf1.5-tg58.8-pck1.8-ci58.2
+    - image: 087285199408.dkr.ecr.us-east-1.amazonaws.com/circle-ci-test-image-base:go1.24.3-tf1.5-tg58.8-pck1.8-ci58.2
   <<: *env
 
 run_precommit: &run_precommit
@@ -151,7 +151,7 @@ jobs:
           shell: powershell.exe
           command: |
             # to save time, we're running the tests in one go
-            
+
             go mod tidy
             go test -v ./...
 
@@ -198,7 +198,7 @@ jobs:
             sign-binary --os mac .gon_arm64.hcl
             echo "Done signing the binary"
             mkdir -p bin
-           
+
             # Replace the files in bin. These are the same file names generated from .gon_amd64.hcl and .gon_arm64.hcl
             unzip terragrunt-iac-engine-opentofu_amd64.zip
             mv terragrunt-iac-engine-opentofu_darwin_amd64 bin/
