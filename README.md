@@ -18,7 +18,7 @@ For more information, see the [Terragrunt IAC Engine RFC](https://github.com/gru
 
 ### Automatic OpenTofu Binary Installation
 
-The engine supports automatic downloading and installation of OpenTofu binaries. This feature eliminates the need to manually install OpenTofu on your system and ensures consistent versions across different environments.
+The engine supports automatic downloading and installation of OpenTofu binaries via the convenient [tofudl library](https://github.com/opentofu/tofudl). This feature eliminates the need to manually install OpenTofu on your system and ensures consistent versions across different environments.
 
 **Key Benefits:**
 
