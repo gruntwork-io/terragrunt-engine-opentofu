@@ -4,16 +4,16 @@ go 1.24.4
 
 require (
 	github.com/creack/pty v1.1.24
-	github.com/gofrs/flock v0.12.1
-	github.com/gruntwork-io/terragrunt-engine-go v0.0.15
+	github.com/gofrs/flock v0.13.0
+	github.com/gruntwork-io/terragrunt-engine-go v0.0.16
 	github.com/hashicorp/go-hclog v1.6.3
 	github.com/hashicorp/go-plugin v1.7.0
 	github.com/opentofu/tofudl v0.0.1
 	github.com/sirupsen/logrus v1.9.3
-	github.com/stretchr/testify v1.10.0
-	golang.org/x/text v0.28.0
-	google.golang.org/grpc v1.74.2
-	google.golang.org/protobuf v1.36.7
+	github.com/stretchr/testify v1.11.1
+	golang.org/x/text v0.30.0
+	google.golang.org/grpc v1.76.0
+	google.golang.org/protobuf v1.36.10
 )
 
 require (
@@ -35,7 +35,7 @@ require (
 	github.com/stretchr/objx v0.5.2 // indirect
 	golang.org/x/crypto v0.40.0 // indirect
 	golang.org/x/net v0.42.0 // indirect
-	golang.org/x/sys v0.34.0 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20250707201910-8d1bb00bc6a7 // indirect
+	golang.org/x/sys v0.37.0 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20250804133106-a7a43d27e69b // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
