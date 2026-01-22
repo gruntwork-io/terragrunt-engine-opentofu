@@ -1,0 +1,27 @@
+name: CI
+
+on:
+  push:
+
+jobs:
+  precommit:
+    uses: ./.github/workflows/precommit.yml
+
+  lint:
+    uses: ./.github/workflows/lint.yml
+
+  test:
+    needs: [precommit, lint]
+    uses: ./.github/workflows/test.yml
+
+  integration-test:
+    needs: [precommit, lint]
+    uses: ./.github/workflows/integration-test.yml
+
+  test-windows:
+    needs: [precommit, lint]
+    uses: ./.github/workflows/test-windows.yml
+
+  build:
+    needs: [test, integration-test]
+    uses: ./.github/workflows/build.yml

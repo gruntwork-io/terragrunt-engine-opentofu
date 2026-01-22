@@ -1,7 +1,6 @@
 version: 2.1
 
 orbs:
-  win: circleci/windows@5.0
   go: circleci/go@1.11
 
 env: &env
@@ -9,35 +8,12 @@ env: &env
     GO111MODULE: auto
     GRUNTWORK_INSTALLER_VERSION: v0.0.40
     MODULE_CI_VERSION: v0.58.1
-    TERRATEST_LOG_PARSER_VERSION: v0.37.0
     GOLANG_VERSION: 1.25.5
-    TOFU_VERSION: 1.10.2
 
 defaults: &defaults
   docker:
     - image: 087285199408.dkr.ecr.us-east-1.amazonaws.com/circle-ci-test-image-base:go1.24.3-tf1.5-tg58.8-pck1.8-ci58.2
   <<: *env
-
-run_precommit: &run_precommit
-  # Fail the build if the pre-commit hooks don't pass. Note: if you run $ pre-commit install locally within this repo, these hooks will
-  # execute automatically every time before you commit, ensuring the build never fails at this step!
-  name: run pre-commit hooks
-  command: |
-    pre-commit install
-    pre-commit run --all-files
-
-install_tofu: &install_tofu
-  name: Install OpenTofu
-  command: |
-    pushd .
-    cd /tmp
-    curl -L "https://github.com/opentofu/opentofu/releases/download/v${TOFU_VERSION}/tofu_${TOFU_VERSION}_linux_amd64.zip" -o tofu.zip
-    unzip -o tofu.zip
-    sudo install -m 0755 tofu /usr/local/bin/tofu
-    rm -rf tofu
-    rm -rf tofu.zip
-    popd
-    tofu --version
 
 install_gruntwork_utils: &install_gruntwork_utils
   name: install gruntwork utils
@@ -45,7 +21,6 @@ install_gruntwork_utils: &install_gruntwork_utils
     curl -Ls https://raw.githubusercontent.com/gruntwork-io/gruntwork-installer/master/bootstrap-gruntwork-installer.sh | bash /dev/stdin --version "${GRUNTWORK_INSTALLER_VERSION}"
     gruntwork-install --module-name "gruntwork-module-circleci-helpers" --repo "https://github.com/gruntwork-io/terraform-aws-ci" --tag "${MODULE_CI_VERSION}"
     gruntwork-install --module-name "git-helpers" --repo "https://github.com/gruntwork-io/terraform-aws-ci" --tag "${MODULE_CI_VERSION}"
-    gruntwork-install --binary-name "terratest_log_parser" --repo "https://github.com/gruntwork-io/terratest" --tag "${TERRATEST_LOG_PARSER_VERSION}"
     configure-environment-for-gruntwork-module \
       --mise-version "NONE" \
       --terraform-version "NONE" \
@@ -56,105 +31,6 @@ install_gruntwork_utils: &install_gruntwork_utils
 # BUILD JOBS
 #----------------------------------------------------------------------------------------------------------------------
 jobs:
-  precommit:
-    <<: *env
-    docker:
-      - image: 087285199408.dkr.ecr.us-east-1.amazonaws.com/circle-ci-test-image-base:go1.21.9-tf1.5-tg39.1-pck1.8-ci54.0
-    steps:
-      - checkout
-      # Fail the build if the pre-commit hooks don't pass. Note: if you run pre-commit install locally, these hooks will
-      # execute automatically every time before you commit, ensuring the build never fails at this step!
-      - run:
-          <<: *run_precommit
-  tests:
-    <<: *defaults
-    steps:
-      - checkout
-      - attach_workspace:
-          at: /home/circleci
-      - run:
-          <<: *install_gruntwork_utils
-      - run:
-          <<: *install_tofu
-      - run:
-          name: Install tools
-          command: |
-            make tools
-      - run:
-          name: Tidy check
-          command: |
-            go mod tidy
-      - run:
-          name: Run lint
-          command: |
-            make lint
-      - run:
-          command: |
-            mkdir -p logs
-            run-go-tests --parallelism 1 --packages "$(go list ./... | grep -v /test | tr '\n' ' ')"  | tee logs/unit.log
-      - run:
-          name: Terratest log parser
-          command: |
-            terratest_log_parser --testlog logs/unit.log --outputdir logs
-          when: always
-      - store_artifacts:
-          path: logs
-      - store_test_results:
-          path: logs
-  integration_tests:
-    <<: *defaults
-    steps:
-      - checkout
-      - attach_workspace:
-          at: /home/circleci
-      - run:
-          <<: *install_gruntwork_utils
-      - run:
-          <<: *install_tofu
-      - run:
-          name: Install tools
-          command: |
-            make tools
-      - run:
-          name: Tidy check
-          command: |
-            go mod tidy
-      - run:
-          command: |
-            mkdir -p logs
-            run-go-tests --packages "$(go list ./... | grep /test | tr '\n' ' ')" | tee logs/integration.log
-      - run:
-          name: Terratest log parser
-          command: |
-            terratest_log_parser --testlog logs/integration.log --outputdir logs
-          when: always
-      - store_artifacts:
-          path: logs
-      - store_test_results:
-          path: logs
-  test_windows:
-    executor:
-      name: win/default
-      size: "large"
-    steps:
-      - checkout
-      - run:
-          name: Install golang
-          shell: powershell.exe
-          command: ./.circleci/install-golang.ps1
-      - run:
-          name: Install Opentofu
-          shell: powershell.exe
-          command: ./.circleci/install-opentofu.ps1
-      - run:
-          name: Run go terraform tests
-          shell: powershell.exe
-          command: |
-            # to save time, we're running the tests in one go
-
-            go mod tidy
-            go test -v ./...
-
   build:
     resource_class: xlarge
     <<: *defaults
@@ -234,57 +110,18 @@ jobs:
 #----------------------------------------------------------------------------------------------------------------------
 workflows:
   version: 2
-  build-and-test:
+  release:
     jobs:
-      - precommit:
-          context:
-            - AWS__PHXDEVOPS__circle-ci-test
-            - GITHUB__PAT__gruntwork-ci
-          filters:
-            tags:
-              only: /^v.*/
-      - tests:
-          context:
-            - AWS__PHXDEVOPS__circle-ci-test
-            - GITHUB__PAT__gruntwork-ci
-            - SLACK__TOKEN__refarch-deployer-test
-            - SLACK__WEBHOOK__refarch-deployer-test
-            - SLACK__CHANNEL__test-workflow-approvals
-          requires:
-            - precommit
-          filters:
-            tags:
-              only: /^v.*/
-      - integration_tests:
-          filters:
-            tags:
-              only: /^v.*/
-          context:
-            - AWS__PHXDEVOPS__circle-ci-test
-            - GCP__automated-tests
-            - GITHUB__PAT__gruntwork-ci
-          requires:
-            - precommit
-      - test_windows:
-          filters:
-            tags:
-              only: /^v.*/
-          context:
-            - AWS__PHXDEVOPS__circle-ci-test
-            - GCP__automated-tests
-            - GITHUB__PAT__gruntwork-ci
-          requires:
-            - precommit
       - build:
           filters:
             tags:
               only: /^v.*/
+            branches:
+              ignore: /.*/
           context:
             - AWS__PHXDEVOPS__circle-ci-test
             - GCP__automated-tests
             - GITHUB__PAT__gruntwork-ci
-          requires:
-            - precommit
       - release:
           requires:
             - build

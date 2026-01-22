@@ -1,0 +1,21 @@
+name: Test Windows
+
+on:
+  workflow_call:
+
+jobs:
+  test-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install dependencies with mise
+        uses: jdx/mise-action@v2
+        with:
+          experimental: true
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+
+      - name: Run tests
+        run: go test -v ./...

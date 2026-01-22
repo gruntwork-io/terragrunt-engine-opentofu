@@ -1,0 +1,76 @@
+name: Build
+
+on:
+  workflow_call:
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            goos: linux
+            goarch: amd64
+          - os: ubuntu-latest
+            goos: linux
+            goarch: arm64
+          - os: ubuntu-latest
+            goos: darwin
+            goarch: amd64
+          - os: ubuntu-latest
+            goos: darwin
+            goarch: arm64
+          - os: ubuntu-latest
+            goos: windows
+            goarch: amd64
+          - os: ubuntu-latest
+            goos: windows
+            goarch: arm64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install dependencies with mise
+        uses: jdx/mise-action@v2
+        with:
+          experimental: true
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+
+      - name: Get Go cache paths
+        id: go-cache-paths
+        run: |
+          echo "go-build=$(go env GOCACHE)" >> $GITHUB_OUTPUT
+          echo "go-mod=$(go env GOMODCACHE)" >> $GITHUB_OUTPUT
+
+      - name: Cache Go modules
+        uses: actions/cache@v4
+        with:
+          path: |
+            ${{ steps.go-cache-paths.outputs.go-build }}
+            ${{ steps.go-cache-paths.outputs.go-mod }}
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: ${{ runner.os }}-go-
+
+      - name: Build
+        env:
+          CGO_ENABLED: "0"
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+        run: |
+          vtag=$(git describe --tags --abbrev=12 --dirty --broken 2>/dev/null || echo "dev")
+          output_name="terragrunt-iac-engine-opentofu_${{ matrix.goos }}_${{ matrix.goarch }}"
+          if [ "${{ matrix.goos }}" = "windows" ]; then
+            output_name="${output_name}.exe"
+          fi
+          go build -o "${output_name}" -ldflags "-X github.com/gruntwork-io/go-commons/version.Version=${vtag} -extldflags '-static'" .
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: terragrunt-iac-engine-opentofu_${{ matrix.goos }}_${{ matrix.goarch }}
+          path: terragrunt-iac-engine-opentofu_${{ matrix.goos }}_${{ matrix.goarch }}*
+          retention-days: 7
