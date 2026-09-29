@@ -47,6 +47,8 @@ function main {
 	fi
 
 	cd "$out_dir"
+	# Hash the raw binaries too: Terragrunt checks the downloaded zip and, on every load,
+	# the extracted binary against this file. Only the zips are attached to the release.
 	sha256sum "${prefix}"_* >"${prefix}_SHA256SUMS"
 	gpg --batch --yes --pinentry-mode loopback "${passphrase_args[@]}" \
 		--output "${prefix}_SHA256SUMS.sig" \

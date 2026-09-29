@@ -141,7 +141,7 @@ Releases are built from a draft release. Nothing is published until a maintainer
    - signs and notarizes the macOS binaries
    - attaches the zips, `SHA256SUMS` and its GPG signature to the draft
 
-   If it fails, fix the problem and run it again. Files already on the draft are replaced.
+   If it fails, fix the problem and run it again. Files with the same names are replaced; delete any other files from the draft yourself.
 
 3. **Review and publish.** Check the attached files and the release notes on the draft, then click **Publish release**. Publishing creates the tag.
 
