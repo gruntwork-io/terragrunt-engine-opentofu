@@ -114,37 +114,31 @@ export TG_EXPERIMENTAL_ENGINE=1
 
 ## Release Process
 
-The Release workflow adds build files to a draft release. A maintainer reviews and publishes it.
+Publishing a pre-release starts the release automatically. Terragrunt ignores pre-releases when it looks for the latest engine, so users get the new version only after it is made the latest release.
 
-1. **Create a draft release.**
+1. **Publish a pre-release.**
    - In GitHub, open **Releases** > **Draft a new release**.
-   - Create a new tag named after the version, for example `v0.2.0`.
-   - Set **Target** to a full commit SHA. The workflow rejects branch names.
-   - If the tag already exists, it must point at the target commit. GitHub ignores the target for an existing tag, so the workflow rejects a mismatch.
-   - Write the release notes and click **Save draft**.
+   - Create a new tag named after the version, for example `v0.2.0`, on `main`.
+   - Write the release notes.
+   - Check **Set as a pre-release** and click **Publish release**.
 
    Or from the command line:
 
    ```bash
-   gh release create v0.2.0 --draft --title v0.2.0 --target "$(git rev-parse origin/main)" --notes-file notes.md
+   gh release create v0.2.0 --prerelease --title v0.2.0 --target main --notes-file notes.md
    ```
 
-2. **Run the [Release](.github/workflows/release.yml) workflow.** GitHub does not start workflows for draft releases, so start it manually: **Actions** > **Release** > **Run workflow**, and enter the version (for example `v0.2.0`). Or:
+   Saving a draft does not start anything, because GitHub does not run workflows for drafts.
 
-   ```bash
-   gh workflow run release.yml -f version=v0.2.0
-   ```
-
-   The workflow:
-   - checks that the draft exists, targets a commit, and matches the tag if it already exists
-   - runs the tests
-   - builds binaries for all supported platforms
+2. **Wait for the [Release](.github/workflows/release.yml) workflow.** It starts automatically and:
+   - runs the tests on the commit the tag points at
+   - builds binaries for all supported platforms from that commit
    - signs and notarizes the macOS binaries
-   - attaches the zips, `SHA256SUMS` and its GPG signature to the draft
+   - attaches the zips, `SHA256SUMS` and its GPG signature to the pre-release
 
-   If it fails, fix the problem and run it again. Files with the same names are replaced; delete any other files from the draft yourself.
+   If it fails, for example because a secret is missing, fix the problem, open the failed run and click **Re-run all jobs**. Files with the same names are replaced.
 
-3. **Review and publish.** Check the attached files and the release notes on the draft, then click **Publish release**. Publishing creates the tag if it does not exist yet.
+3. **Make it the latest release.** Check the attached files and the release notes, then edit the release, clear **Set as a pre-release** and save.
 
 The Release workflow needs these repository secrets:
 
