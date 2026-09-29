@@ -22,6 +22,7 @@ jobs:
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
           ref: ${{ inputs.ref }}
+          persist-credentials: false
 
       - name: Use mise to install dependencies
         uses: jdx/mise-action@dad1bfd3df957f44999b559dd69dc1671cb4e9ea # v4.2.1
@@ -34,9 +35,7 @@ jobs:
 
       - id: go-cache-paths
         shell: bash
-        run: |
-          echo "go-build=$(go env GOCACHE)" >> "$GITHUB_OUTPUT"
-          echo "go-mod=$(go env GOMODCACHE)" >> "$GITHUB_OUTPUT"
+        run: .github/scripts/go-cache-paths.sh
 
       - name: Go Build Cache
         uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
@@ -52,9 +51,7 @@ jobs:
 
       - name: Run Tests
         shell: bash
-        run: |
-          set -o pipefail
-          go test -v -timeout 45m ./... 2>&1 | tee test-output.log
+        run: go test -v -timeout 45m ./... 2>&1 | tee test-output.log
         env:
           # Adding token here to reduce the likelihood of hitting rate limit issues.
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

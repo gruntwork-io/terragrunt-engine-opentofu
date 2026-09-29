@@ -12,6 +12,8 @@ clean:
 
 lint:
 	golangci-lint run ./...
+	shellcheck .github/scripts/*.sh
+	shfmt -d .github/scripts
 
 test:
 	go test -v ./...

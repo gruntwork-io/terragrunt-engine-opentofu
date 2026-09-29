@@ -11,6 +11,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
 
       - name: Use mise to install dependencies
         uses: jdx/mise-action@dad1bfd3df957f44999b559dd69dc1671cb4e9ea # v4.2.1
@@ -23,8 +25,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - id: go-cache-paths
-        run: |
-          echo "go-mod=$(go env GOMODCACHE)" >> "$GITHUB_OUTPUT"
+        run: .github/scripts/go-cache-paths.sh
 
       - name: Go Mod Cache
         uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
@@ -32,14 +33,5 @@ jobs:
           path: ${{ steps.go-cache-paths.outputs.go-mod }}
           key: ${{ runner.os }}-go-mod-${{ hashFiles('**/go.sum') }}-linux-amd64
 
-      - name: Run go mod tidy
-        run: |
-          go mod tidy
-
-      - name: Check for changes
-        run: |
-          if [ -n "$(git status --porcelain)" ]; then
-            echo "::error::go mod tidy made changes to go.mod or go.sum"
-            git diff
-            exit 1
-          fi
+      - name: Check go mod tidy
+        run: .github/scripts/check-go-mod-tidy.sh

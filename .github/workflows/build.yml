@@ -32,6 +32,7 @@ jobs:
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
           ref: ${{ inputs.ref }}
+          persist-credentials: false
 
       - name: Use mise to install dependencies
         uses: jdx/mise-action@dad1bfd3df957f44999b559dd69dc1671cb4e9ea # v4.2.1
@@ -44,9 +45,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - id: go-cache-paths
-        run: |
-          echo "go-build=$(go env GOCACHE)" >> "$GITHUB_OUTPUT"
-          echo "go-mod=$(go env GOMODCACHE)" >> "$GITHUB_OUTPUT"
+        run: .github/scripts/go-cache-paths.sh
 
       - name: Go Build Cache
         uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
@@ -62,18 +61,10 @@ jobs:
 
       - name: Build binary
         env:
-          GOOS: ${{ matrix.os }}
-          GOARCH: ${{ matrix.arch }}
-          CGO_ENABLED: "0"
+          TARGET_OS: ${{ matrix.os }}
+          TARGET_ARCH: ${{ matrix.arch }}
           VERSION: ${{ inputs.version || github.ref_name }}
-        run: |
-          ext=""
-          if [[ "$GOOS" == "windows" ]]; then
-            ext=".exe"
-          fi
-          go build -o "bin/terragrunt-iac-engine-opentofu_${GOOS}_${GOARCH}${ext}" \
-            -ldflags "-X github.com/gruntwork-io/go-commons/version.Version=${VERSION} -extldflags '-static'" \
-            .
+        run: .github/scripts/build-binary.sh "$TARGET_OS" "$TARGET_ARCH" "$VERSION"
 
       - name: Upload binary
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

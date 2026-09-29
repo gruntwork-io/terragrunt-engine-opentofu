@@ -54,6 +54,8 @@ function main {
 	gpg --verify "${prefix}_SHA256SUMS.sig" "${prefix}_SHA256SUMS"
 
 	ls -l
+
+	return 0
 }
 
 main "$@"
