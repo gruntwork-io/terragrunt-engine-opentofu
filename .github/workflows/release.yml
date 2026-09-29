@@ -1,0 +1,159 @@
+name: Release
+
+# Pushing a vX.Y.Z-rcN tag builds, signs and publishes release vX.Y.Z.
+
+on:
+  push:
+    tags:
+      - 'v*-rc*'
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Validate tag
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+
+    steps:
+      - id: version
+        run: |
+          if [[ ! "$GITHUB_REF_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+-rc[0-9]+$ ]]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match vX.Y.Z-rcN"
+            exit 1
+          fi
+          echo "version=${GITHUB_REF_NAME%-rc*}" >> "$GITHUB_OUTPUT"
+
+  base_tests:
+    needs: validate
+    uses: ./.github/workflows/base-test.yml
+    permissions:
+      contents: read
+      checks: write
+    secrets: inherit
+
+  build:
+    needs: validate
+    uses: ./.github/workflows/build.yml
+    secrets: inherit
+
+  sign_macos:
+    name: Sign macOS binaries
+    needs: [base_tests, build]
+    runs-on: macos-latest
+    env:
+      GON_VERSION: v0.0.37
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+
+      - name: Download macOS binaries
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: terragrunt-iac-engine-opentofu_darwin_*
+          path: bin
+          merge-multiple: true
+
+      - name: Install gon
+        run: |
+          curl -sSfL -o gon.zip "https://github.com/Bearer/gon/releases/download/${GON_VERSION}/gon_macos.zip"
+          unzip -o gon.zip gon
+          sudo install -m 0755 gon /usr/local/bin/gon
+          rm -f gon gon.zip
+          gon --version
+
+      - name: Import signing certificate
+        env:
+          MACOS_CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE }}
+          MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+        run: |
+          keychain="$RUNNER_TEMP/signing.keychain-db"
+          keychain_pw="$(openssl rand -hex 16)"
+          security create-keychain -p "$keychain_pw" "$keychain"
+          security default-keychain -s "$keychain"
+          security unlock-keychain -p "$keychain_pw" "$keychain"
+          echo "$MACOS_CERTIFICATE" | base64 --decode | security import /dev/stdin -f pkcs12 -k "$keychain" -P "$MACOS_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+          # Apple Developer ID G2 intermediate certificate, see https://www.apple.com/certificateauthority/
+          curl -sSfL -o "$RUNNER_TEMP/DeveloperIDG2CA.cer" https://www.apple.com/certificateauthority/DeveloperIDG2CA.cer
+          sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain "$RUNNER_TEMP/DeveloperIDG2CA.cer"
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$keychain_pw" "$keychain"
+
+      - name: Sign and notarize
+        env:
+          AC_PASSWORD: ${{ secrets.MACOS_AC_PASSWORD }}
+          AC_PROVIDER: ${{ secrets.MACOS_AC_PROVIDER }}
+        run: |
+          gon -log-level=info .gon_amd64.hcl
+          gon -log-level=info .gon_arm64.hcl
+          # gon zips the signed binaries; use those in place of the unsigned ones.
+          for arch in amd64 arm64; do
+            unzip -o "terragrunt-iac-engine-opentofu_${arch}.zip"
+            mv "terragrunt-iac-engine-opentofu_darwin_${arch}" bin/
+            codesign -dv --verbose=4 "bin/terragrunt-iac-engine-opentofu_darwin_${arch}"
+          done
+
+      - name: Upload signed binaries
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: signed-darwin-binaries
+          path: bin/terragrunt-iac-engine-opentofu_darwin_*
+          if-no-files-found: error
+
+  release:
+    name: Publish release
+    needs: [validate, sign_macos]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+
+      - name: Download Linux binaries
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: terragrunt-iac-engine-opentofu_linux_*
+          path: bin
+          merge-multiple: true
+
+      - name: Download Windows binaries
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: terragrunt-iac-engine-opentofu_windows_*
+          path: bin
+          merge-multiple: true
+
+      - name: Download signed macOS binaries
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: signed-darwin-binaries
+          path: bin
+
+      - name: Import GPG key
+        env:
+          GW_ENGINE_GPG_KEY: ${{ secrets.GW_ENGINE_GPG_KEY }}
+        run: echo "$GW_ENGINE_GPG_KEY" | base64 --decode | gpg --batch --import
+
+      - name: Package release files
+        env:
+          GPG_PASSPHRASE: ${{ secrets.GW_ENGINE_GPG_KEY_PW }}
+          VERSION: ${{ needs.validate.outputs.version }}
+        run: .github/scripts/package-release.sh bin release "$VERSION"
+
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          VERSION: ${{ needs.validate.outputs.version }}
+        run: |
+          # Raw binaries are listed in SHA256SUMS but only the zips are published.
+          assets=(release/*.zip release/*_SHA256SUMS release/*_SHA256SUMS.sig)
+          if gh release view "$VERSION" > /dev/null 2>&1; then
+            gh release upload "$VERSION" "${assets[@]}" --clobber
+          else
+            gh release create "$VERSION" "${assets[@]}" --target "$GITHUB_SHA" --title "$VERSION" --generate-notes
+          fi
