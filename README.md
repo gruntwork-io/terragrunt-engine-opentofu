@@ -114,12 +114,13 @@ export TG_EXPERIMENTAL_ENGINE=1
 
 ## Release Process
 
-Releases are built from a draft release. Nothing is published until a maintainer reviews the draft and publishes it.
+The Release workflow adds build files to a draft release. A maintainer reviews and publishes it.
 
 1. **Create a draft release.**
    - In GitHub, open **Releases** > **Draft a new release**.
    - Create a new tag named after the version, for example `v0.2.0`.
-   - Set **Target** to a specific commit, not a branch. The workflow rejects drafts that target a branch, so the published tag always points at the commit the binaries were built from.
+   - Set **Target** to a full commit SHA. The workflow rejects branch names.
+   - If the tag already exists, it must point at the target commit. GitHub ignores the target for an existing tag, so the workflow rejects a mismatch.
    - Write the release notes and click **Save draft**.
 
    Or from the command line:
@@ -135,7 +136,7 @@ Releases are built from a draft release. Nothing is published until a maintainer
    ```
 
    The workflow:
-   - checks that the draft exists and targets a commit
+   - checks that the draft exists, targets a commit, and matches the tag if it already exists
    - runs the tests
    - builds binaries for all supported platforms
    - signs and notarizes the macOS binaries
@@ -143,7 +144,7 @@ Releases are built from a draft release. Nothing is published until a maintainer
 
    If it fails, fix the problem and run it again. Files with the same names are replaced; delete any other files from the draft yourself.
 
-3. **Review and publish.** Check the attached files and the release notes on the draft, then click **Publish release**. Publishing creates the tag.
+3. **Review and publish.** Check the attached files and the release notes on the draft, then click **Publish release**. Publishing creates the tag if it does not exist yet.
 
 The Release workflow needs these repository secrets:
 

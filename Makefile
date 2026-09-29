@@ -12,11 +12,14 @@ clean:
 
 lint:
 	golangci-lint run ./...
-	shellcheck .github/scripts/*.sh
+	shellcheck .github/scripts/*.sh .github/scripts/tests/helpers/*.sh
 	shfmt -d .github/scripts
 
 test:
 	go test -v ./...
+
+test-scripts:
+	bats .github/scripts/tests
 
 fmt:
 	@echo "Running source files through gofmt..."
@@ -28,4 +31,4 @@ pre-commit:
 tools:
 	go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.13.2
 
-.PHONY: tools pre-commit lint protoc test default
+.PHONY: tools pre-commit lint protoc test test-scripts default
