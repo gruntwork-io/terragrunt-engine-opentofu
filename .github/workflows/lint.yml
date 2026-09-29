@@ -44,3 +44,6 @@ jobs:
 
     - name: Lint
       run: make lint
+
+    - name: Test release scripts
+      run: make test-scripts

@@ -3,8 +3,8 @@
 # Checks that VERSION is a draft release targeting a commit SHA and writes
 # version and ref to GITHUB_OUTPUT.
 #
-# The target must be a SHA, not a branch, so the tag created on publish points
-# at the commit the binaries were built from.
+# The target must be a SHA, not a branch, and an existing version tag must point at
+# the same commit, so the published tag matches the commit the binaries are built from.
 #
 # Environment variables:
 #   VERSION: version of the draft release, e.g. v0.2.0
@@ -39,6 +39,8 @@ function main {
 		echo "::error::Draft release target must be a full commit SHA, got '$ref'. Edit the draft and select a specific commit."
 		exit 1
 	fi
+
+	"$(dirname "${BASH_SOURCE[0]}")/check-version-tag.sh" "$VERSION" "$ref"
 
 	{
 		printf 'version=%s\n' "$VERSION"

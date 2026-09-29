@@ -2,8 +2,9 @@
 #
 # Attaches the packaged release files to the VERSION draft release.
 #
-# Fails without uploading when the release was published, or when the draft target changed
-# after the binaries were built, so the files always match the commit the tag will point at.
+# Fails without uploading when the release was published, when the draft target changed
+# after the binaries were built, or when the version tag points at another commit, so the
+# files always match the commit the tag will point at.
 #
 # Usage: upload-release-assets.sh <release-dir>
 #
@@ -35,6 +36,9 @@ function main {
 		echo "::error::Draft $VERSION now targets $target, but the binaries were built from $EXPECTED_REF. Files not attached, run the workflow again."
 		exit 1
 	fi
+
+	# The tag may have been created or moved while the workflow was running.
+	"$(dirname "${BASH_SOURCE[0]}")/check-version-tag.sh" "$VERSION" "$EXPECTED_REF"
 
 	# Raw binaries are listed in SHA256SUMS, but only the zips are attached.
 	gh release upload "$VERSION" \
