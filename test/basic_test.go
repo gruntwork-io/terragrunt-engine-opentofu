@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"os"
 	"strings"
@@ -20,21 +21,10 @@ import (
 	"google.golang.org/protobuf/types/known/anypb"
 )
 
-const bufSize = 1024 * 1024
-
-var lis *bufconn.Listener
-
-func init() {
-	lis = bufconn.Listen(bufSize)
-	server := grpc.NewServer()
-	tgengine.RegisterEngineServer(server, &engine.TofuEngine{})
-
-	go func() {
-		if err := server.Serve(lis); err != nil {
-			panic(err)
-		}
-	}()
-}
+const (
+	bufSize    = 1024 * 1024
+	versionCmd = "version"
+)
 
 // Helper function to create anypb.Any from a string value
 func createStringAny(value string) (*anypb.Any, error) {
@@ -86,7 +76,7 @@ func TestAutoInstallExplicitVersion(t *testing.T) {
 		"tofu_version": versionAny,
 	}
 
-	stdout, stderr, err := runTofuCommandWithInit(t, ctx, "tofu", []string{"version"}, "fixture-basic-project", map[string]string{}, meta)
+	stdout, stderr, err := runTofuCommandWithInit(t, ctx, "tofu", []string{versionCmd}, "fixture-basic-project", map[string]string{}, meta)
 	require.NoError(t, err)
 
 	require.NotEmpty(t, stdout)
@@ -107,7 +97,7 @@ func TestAutoInstallInvalidVersion(t *testing.T) {
 		"tofu_version": versionAny,
 	}
 
-	_, _, err = runTofuCommandWithInit(t, ctx, "tofu", []string{"version"}, "fixture-basic-project", map[string]string{}, meta)
+	_, _, err = runTofuCommandWithInit(t, ctx, "tofu", []string{versionCmd}, "fixture-basic-project", map[string]string{}, meta)
 	require.ErrorIs(t, err, ErrFailedToInitialize)
 
 	assert.Contains(t, err.Error(), "failed to download OpenTofu: No such version: 0.0.0")
@@ -125,7 +115,7 @@ func TestAutoInstallLatestVersion(t *testing.T) {
 		"tofu_version": versionAny,
 	}
 
-	stdout, stderr, err := runTofuCommandWithInit(t, ctx, "tofu", []string{"version"}, "fixture-basic-project", map[string]string{}, meta)
+	stdout, stderr, err := runTofuCommandWithInit(t, ctx, "tofu", []string{versionCmd}, "fixture-basic-project", map[string]string{}, meta)
 	require.NoError(t, err)
 
 	require.NotEmpty(t, stdout)
@@ -141,7 +131,7 @@ func TestNoAutoInstallWithoutVersion(t *testing.T) {
 	// Test without specifying version (should use system binary)
 	meta := map[string]*anypb.Any{}
 
-	stdout, _, err := runTofuCommandWithInit(t, ctx, "tofu", []string{"version"}, "fixture-basic-project", map[string]string{}, meta)
+	stdout, _, err := runTofuCommandWithInit(t, ctx, "tofu", []string{versionCmd}, "fixture-basic-project", map[string]string{}, meta)
 
 	// This test might fail if system doesn't have tofu installed, which is expected behavior
 	if err != nil {
@@ -174,7 +164,7 @@ func TestAutoInstallWithCustomInstallDir(t *testing.T) {
 		"tofu_install_dir": installDirAny,
 	}
 
-	stdout, stderr, err := runTofuCommandWithInit(t, ctx, "tofu", []string{"version"}, "fixture-basic-project", map[string]string{}, meta)
+	stdout, stderr, err := runTofuCommandWithInit(t, ctx, "tofu", []string{versionCmd}, "fixture-basic-project", map[string]string{}, meta)
 	require.NoError(t, err)
 
 	require.NotEmpty(t, stdout)
@@ -188,24 +178,40 @@ func TestAutoInstallWithCustomInstallDir(t *testing.T) {
 	}()
 }
 
-func bufDialer(context.Context, string) (net.Conn, error) {
-	return lis.Dial()
+// newEngineClient starts an engine server for a single command, so engine state such as
+// the OpenTofu binary path set by Init does not leak between parallel tests.
+func newEngineClient(t *testing.T) tgengine.EngineClient {
+	t.Helper()
+
+	lis := bufconn.Listen(bufSize)
+	server := grpc.NewServer()
+	tgengine.RegisterEngineServer(server, &engine.TofuEngine{})
+
+	go func() {
+		if err := server.Serve(lis); err != nil {
+			panic(err)
+		}
+	}()
+
+	dialer := func(context.Context, string) (net.Conn, error) {
+		return lis.Dial()
+	}
+
+	conn, err := grpc.NewClient("passthrough://bufnet", grpc.WithContextDialer(dialer), grpc.WithTransportCredentials(insecure.NewCredentials()))
+	require.NoError(t, err)
+
+	t.Cleanup(func() {
+		require.NoError(t, conn.Close())
+		server.Stop()
+	})
+
+	return tgengine.NewEngineClient(conn)
 }
 
 func runTofuCommand(t *testing.T, ctx context.Context, command string, args []string, workingDir string, envVars map[string]string) (string, string, error) {
 	t.Helper()
 
-	conn, err := grpc.NewClient("passthrough://bufnet", grpc.WithContextDialer(bufDialer), grpc.WithTransportCredentials(insecure.NewCredentials()))
-	if err != nil {
-		return "", "", err
-	}
-
-	defer func() {
-		err := conn.Close()
-		require.NoError(t, err)
-	}()
-
-	client := tgengine.NewEngineClient(conn)
+	client := newEngineClient(t)
 
 	stream, err := client.Run(ctx, &tgengine.RunRequest{
 		Command:    command,
@@ -224,8 +230,12 @@ func runTofuCommand(t *testing.T, ctx context.Context, command string, args []st
 
 	for {
 		resp, err := stream.Recv()
-		if err != nil {
+		if errors.Is(err, io.EOF) {
 			break
+		}
+
+		if err != nil {
+			return "", "", err
 		}
 
 		if stdoutMsg := resp.GetStdout(); stdoutMsg != nil {
@@ -255,17 +265,7 @@ var ErrFailedToInitialize = errors.New("failed to initialize")
 func runTofuCommandWithInit(t *testing.T, ctx context.Context, command string, args []string, workingDir string, envVars map[string]string, meta map[string]*anypb.Any) (string, string, error) {
 	t.Helper()
 
-	conn, err := grpc.NewClient("passthrough://bufnet", grpc.WithContextDialer(bufDialer), grpc.WithTransportCredentials(insecure.NewCredentials()))
-	if err != nil {
-		return "", "", err
-	}
-
-	defer func() {
-		err := conn.Close()
-		require.NoError(t, err)
-	}()
-
-	client := tgengine.NewEngineClient(conn)
+	client := newEngineClient(t)
 
 	// First call Init with the specified metadata
 	initStream, err := client.Init(ctx, &tgengine.InitRequest{
@@ -280,8 +280,12 @@ func runTofuCommandWithInit(t *testing.T, ctx context.Context, command string, a
 
 	for {
 		res, err := initStream.Recv()
-		if err != nil {
+		if errors.Is(err, io.EOF) {
 			break
+		}
+
+		if err != nil {
+			return "", "", err
 		}
 
 		if stderrMsg := res.GetStderr(); stderrMsg != nil {
@@ -316,8 +320,12 @@ func runTofuCommandWithInit(t *testing.T, ctx context.Context, command string, a
 
 	for {
 		resp, err := stream.Recv()
-		if err != nil {
+		if errors.Is(err, io.EOF) {
 			break
+		}
+
+		if err != nil {
+			return "", "", err
 		}
 
 		if stdoutMsg := resp.GetStdout(); stdoutMsg != nil {

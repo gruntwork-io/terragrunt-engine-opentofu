@@ -1,0 +1,152 @@
+name: Release
+
+# Builds, signs and attaches release files to an existing draft release.
+# The draft is published manually after review.
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version of an existing draft release, e.g. v0.2.0'
+        required: true
+        type: string
+
+concurrency:
+  group: release-${{ inputs.version }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Validate draft release
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.resolve.outputs.version }}
+      ref: ${{ steps.resolve.outputs.ref }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+
+      - id: resolve
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          VERSION: ${{ inputs.version }}
+        run: .github/scripts/validate-draft-release.sh
+
+  base_tests:
+    needs: validate
+    uses: ./.github/workflows/base-test.yml
+    with:
+      ref: ${{ needs.validate.outputs.ref }}
+    permissions:
+      contents: read
+      checks: write
+    secrets: inherit
+
+  build:
+    needs: validate
+    uses: ./.github/workflows/build.yml
+    with:
+      ref: ${{ needs.validate.outputs.ref }}
+      version: ${{ needs.validate.outputs.version }}
+    secrets: inherit
+
+  sign_macos:
+    name: Sign macOS binaries
+    needs: [validate, base_tests, build]
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          ref: ${{ needs.validate.outputs.ref }}
+          persist-credentials: false
+
+      - name: Download macOS binaries
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: terragrunt-iac-engine-opentofu_darwin_*
+          path: bin
+          merge-multiple: true
+
+      - name: Install gon
+        run: .github/scripts/install-gon.sh v0.0.37
+
+      - name: Import signing certificate
+        env:
+          MACOS_CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE }}
+          MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+        run: .github/scripts/import-macos-certificate.sh
+
+      - name: Sign and notarize
+        env:
+          AC_PASSWORD: ${{ secrets.MACOS_AC_PASSWORD }}
+          AC_PROVIDER: ${{ secrets.MACOS_AC_PROVIDER }}
+        run: .github/scripts/sign-macos-binaries.sh
+
+      - name: Upload signed binaries
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: signed-darwin-binaries
+          path: bin/terragrunt-iac-engine-opentofu_darwin_*
+          if-no-files-found: error
+
+  upload:
+    name: Attach files to draft release
+    needs: [validate, sign_macos]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          ref: ${{ needs.validate.outputs.ref }}
+          persist-credentials: false
+
+      - name: Download Linux binaries
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: terragrunt-iac-engine-opentofu_linux_*
+          path: bin
+          merge-multiple: true
+
+      - name: Download Windows binaries
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: terragrunt-iac-engine-opentofu_windows_*
+          path: bin
+          merge-multiple: true
+
+      - name: Download signed macOS binaries
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: signed-darwin-binaries
+          path: bin
+
+      - name: Import GPG key
+        env:
+          GW_ENGINE_GPG_KEY: ${{ secrets.GW_ENGINE_GPG_KEY }}
+        run: .github/scripts/import-gpg-key.sh
+
+      - name: Package release files
+        env:
+          GPG_PASSPHRASE: ${{ secrets.GW_ENGINE_GPG_KEY_PW }}
+          VERSION: ${{ needs.validate.outputs.version }}
+        run: .github/scripts/package-release.sh bin release "$VERSION"
+
+      - name: Attach files to draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          VERSION: ${{ needs.validate.outputs.version }}
+          EXPECTED_REF: ${{ needs.validate.outputs.ref }}
+        run: .github/scripts/upload-release-assets.sh release

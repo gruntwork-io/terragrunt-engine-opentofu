@@ -112,25 +112,50 @@ Make sure to set the required environment variable to enable the experimental en
 export TG_EXPERIMENTAL_ENGINE=1
 ```
 
-## Automated Release Process
+## Release Process
 
-To initiate the release process, create a pre-release named using the following naming convention: `vx.y.z-rcdateincrement`, with the appropriate corresponding tag.
+The Release workflow adds build files to a draft release. A maintainer reviews and publishes it.
 
-- Example Tag: `v0.0.1-rc2024053001`
-  - `v0.0.1` represents the version number.
-  - `-rc2024053001` indicates a release candidate, with the date and an incrementing identifier.
+1. **Create a draft release.**
+   - In GitHub, open **Releases** > **Draft a new release**.
+   - Create a new tag named after the version, for example `v0.2.0`.
+   - Set **Target** to a full commit SHA. The workflow rejects branch names.
+   - If the tag already exists, it must point at the target commit. GitHub ignores the target for an existing tag, so the workflow rejects a mismatch.
+   - Write the release notes and click **Save draft**.
 
-Workflow:
+   Or from the command line:
 
-- Tag Creation:
-  - Create a pre-release ending with `-rc...` to the repository.
-  - This tag format will automatically trigger a CircleCI job.
-- CI/CD Process:
-  - CircleCI will run a build job to compile binaries and perform necessary checks.
-  - Upon successful completion, a release job will be initiated.
-- GitHub Release:
-  - The release job creates a new GitHub release.
-  - All compiled assets, including checksums and signatures, are uploaded to the release.
+   ```bash
+   gh release create v0.2.0 --draft --title v0.2.0 --target "$(git rev-parse origin/main)" --notes-file notes.md
+   ```
+
+2. **Run the [Release](.github/workflows/release.yml) workflow.** GitHub does not start workflows for draft releases, so start it manually: **Actions** > **Release** > **Run workflow**, and enter the version (for example `v0.2.0`). Or:
+
+   ```bash
+   gh workflow run release.yml -f version=v0.2.0
+   ```
+
+   The workflow:
+   - checks that the draft exists, targets a commit, and matches the tag if it already exists
+   - runs the tests
+   - builds binaries for all supported platforms
+   - signs and notarizes the macOS binaries
+   - attaches the zips, `SHA256SUMS` and its GPG signature to the draft
+
+   If it fails, fix the problem and run it again. Files with the same names are replaced; delete any other files from the draft yourself.
+
+3. **Review and publish.** Check the attached files and the release notes on the draft, then click **Publish release**. Publishing creates the tag if it does not exist yet.
+
+The Release workflow needs these repository secrets:
+
+| Secret | Purpose |
+|---|---|
+| `MACOS_CERTIFICATE` | Apple Developer ID certificate, P12, base64 encoded |
+| `MACOS_CERTIFICATE_PASSWORD` | Password of the P12 certificate |
+| `MACOS_AC_PASSWORD` | Apple notarization password |
+| `MACOS_AC_PROVIDER` | Apple notarization provider (team) |
+| `GW_ENGINE_GPG_KEY` | Engine GPG private key, base64 encoded, used to sign `SHA256SUMS` |
+| `GW_ENGINE_GPG_KEY_PW` | Passphrase of the engine GPG key |
 
 ## Contributing
 

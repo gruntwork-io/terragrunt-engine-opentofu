@@ -1,0 +1,33 @@
+name: CI
+
+on:
+  push:
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    uses: ./.github/workflows/lint.yml
+    secrets: inherit
+
+  precommit:
+    uses: ./.github/workflows/precommit.yml
+    secrets: inherit
+
+  go_mod_tidy_check:
+    uses: ./.github/workflows/go-mod-tidy-check.yml
+    secrets: inherit
+
+  base_tests:
+    needs: [lint, precommit, go_mod_tidy_check]
+    uses: ./.github/workflows/base-test.yml
+    permissions:
+      contents: read
+      checks: write
+    secrets: inherit
+
+  build:
+    needs: [lint, precommit, go_mod_tidy_check]
+    uses: ./.github/workflows/build.yml
+    secrets: inherit
