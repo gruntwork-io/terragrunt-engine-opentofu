@@ -20,7 +20,10 @@ import (
 	"google.golang.org/protobuf/types/known/anypb"
 )
 
-const bufSize = 1024 * 1024
+const (
+	bufSize    = 1024 * 1024
+	versionCmd = "version"
+)
 
 var lis *bufconn.Listener
 
@@ -86,7 +89,7 @@ func TestAutoInstallExplicitVersion(t *testing.T) {
 		"tofu_version": versionAny,
 	}
 
-	stdout, stderr, err := runTofuCommandWithInit(t, ctx, "tofu", []string{"version"}, "fixture-basic-project", map[string]string{}, meta)
+	stdout, stderr, err := runTofuCommandWithInit(t, ctx, "tofu", []string{versionCmd}, "fixture-basic-project", map[string]string{}, meta)
 	require.NoError(t, err)
 
 	require.NotEmpty(t, stdout)
@@ -107,7 +110,7 @@ func TestAutoInstallInvalidVersion(t *testing.T) {
 		"tofu_version": versionAny,
 	}
 
-	_, _, err = runTofuCommandWithInit(t, ctx, "tofu", []string{"version"}, "fixture-basic-project", map[string]string{}, meta)
+	_, _, err = runTofuCommandWithInit(t, ctx, "tofu", []string{versionCmd}, "fixture-basic-project", map[string]string{}, meta)
 	require.ErrorIs(t, err, ErrFailedToInitialize)
 
 	assert.Contains(t, err.Error(), "failed to download OpenTofu: No such version: 0.0.0")
@@ -125,7 +128,7 @@ func TestAutoInstallLatestVersion(t *testing.T) {
 		"tofu_version": versionAny,
 	}
 
-	stdout, stderr, err := runTofuCommandWithInit(t, ctx, "tofu", []string{"version"}, "fixture-basic-project", map[string]string{}, meta)
+	stdout, stderr, err := runTofuCommandWithInit(t, ctx, "tofu", []string{versionCmd}, "fixture-basic-project", map[string]string{}, meta)
 	require.NoError(t, err)
 
 	require.NotEmpty(t, stdout)
@@ -141,7 +144,7 @@ func TestNoAutoInstallWithoutVersion(t *testing.T) {
 	// Test without specifying version (should use system binary)
 	meta := map[string]*anypb.Any{}
 
-	stdout, _, err := runTofuCommandWithInit(t, ctx, "tofu", []string{"version"}, "fixture-basic-project", map[string]string{}, meta)
+	stdout, _, err := runTofuCommandWithInit(t, ctx, "tofu", []string{versionCmd}, "fixture-basic-project", map[string]string{}, meta)
 
 	// This test might fail if system doesn't have tofu installed, which is expected behavior
 	if err != nil {
@@ -174,7 +177,7 @@ func TestAutoInstallWithCustomInstallDir(t *testing.T) {
 		"tofu_install_dir": installDirAny,
 	}
 
-	stdout, stderr, err := runTofuCommandWithInit(t, ctx, "tofu", []string{"version"}, "fixture-basic-project", map[string]string{}, meta)
+	stdout, stderr, err := runTofuCommandWithInit(t, ctx, "tofu", []string{versionCmd}, "fixture-basic-project", map[string]string{}, meta)
 	require.NoError(t, err)
 
 	require.NotEmpty(t, stdout)

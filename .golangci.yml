@@ -1,7 +1,6 @@
-# This file is generated using `make update-local-lint` to track the linting used in Terragrunt. Do not edit manually.
 version: "2"
 run:
-  go: "1.26"
+  go: "1.27"
   issues-exit-code: 1
   tests: true
 output:

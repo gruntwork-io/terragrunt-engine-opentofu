@@ -124,13 +124,24 @@ Workflow:
 
 - Tag Creation:
   - Create a pre-release ending with `-rc...` to the repository.
-  - This tag format will automatically trigger a CircleCI job.
+  - This tag format will automatically trigger the GitHub Actions [Release](.github/workflows/release.yml) workflow.
 - CI/CD Process:
-  - CircleCI will run a build job to compile binaries and perform necessary checks.
-  - Upon successful completion, a release job will be initiated.
+  - The workflow runs the tests and compiles binaries for all supported platforms.
+  - macOS binaries are signed and notarized.
 - GitHub Release:
-  - The release job creates a new GitHub release.
+  - The workflow creates the `vx.y.z` GitHub release (without the `-rc...` suffix).
   - All compiled assets, including checksums and signatures, are uploaded to the release.
+
+The Release workflow needs these repository secrets:
+
+| Secret | Purpose |
+|---|---|
+| `MACOS_CERTIFICATE` | Apple Developer ID certificate, P12, base64 encoded |
+| `MACOS_CERTIFICATE_PASSWORD` | Password of the P12 certificate |
+| `MACOS_AC_PASSWORD` | Apple notarization password |
+| `MACOS_AC_PROVIDER` | Apple notarization provider (team) |
+| `GW_ENGINE_GPG_KEY` | Engine GPG private key, base64 encoded, used to sign `SHA256SUMS` |
+| `GW_ENGINE_GPG_KEY_PW` | Passphrase of the engine GPG key |
 
 ## Contributing
 

@@ -10,15 +10,8 @@ build: $(shell find . \( -type f -name '*.go' -print \))
 clean:
 	rm -f engine
 
-lint: SHELL:=/bin/bash
 lint:
-	golangci-lint run -c <(curl -s https://raw.githubusercontent.com/gruntwork-io/terragrunt/main/.golangci.yml) ./...
-
-update-local-lint: SHELL:=/bin/bash
-update-local-lint:
-	curl -s https://raw.githubusercontent.com/gruntwork-io/terragrunt/main/.golangci.yml --output .golangci.yml
-	tmpfile=$$(mktemp) ;\
-	echo '# This file is generated using `make update-local-lint` to track the linting used in Terragrunt. Do not edit manually.' | cat - .golangci.yml > $${tmpfile} && mv $${tmpfile} .golangci.yml
+	golangci-lint run ./...
 
 test:
 	go test -v ./...
@@ -31,6 +24,6 @@ pre-commit:
 	pre-commit run --all-files
 
 tools:
-	go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.9.0
+	go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.13.2
 
 .PHONY: tools pre-commit lint protoc test default
