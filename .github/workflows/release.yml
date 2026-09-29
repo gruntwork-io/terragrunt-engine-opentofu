@@ -1,34 +1,68 @@
 name: Release
 
-# Pushing a vX.Y.Z-rcN tag builds, signs and publishes release vX.Y.Z.
+# Builds, signs and attaches release files to an existing draft release.
+# The draft is published manually after review.
 
 on:
-  push:
-    tags:
-      - 'v*-rc*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version of an existing draft release, e.g. v0.2.0'
+        required: true
+        type: string
+
+concurrency:
+  group: release-${{ inputs.version }}
+  cancel-in-progress: false
 
 permissions:
   contents: read
 
 jobs:
   validate:
-    name: Validate tag
+    name: Validate draft release
     runs-on: ubuntu-latest
     outputs:
-      version: ${{ steps.version.outputs.version }}
+      version: ${{ steps.resolve.outputs.version }}
+      ref: ${{ steps.resolve.outputs.ref }}
 
     steps:
-      - id: version
+      - id: resolve
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          VERSION: ${{ inputs.version }}
         run: |
-          if [[ ! "$GITHUB_REF_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+-rc[0-9]+$ ]]; then
-            echo "::error::Tag $GITHUB_REF_NAME does not match vX.Y.Z-rcN"
+          if [[ ! "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error::Version $VERSION is not a valid semver tag like v0.2.0"
             exit 1
           fi
-          echo "version=${GITHUB_REF_NAME%-rc*}" >> "$GITHUB_OUTPUT"
+
+          if ! release_json="$(gh release view "$VERSION" --json isDraft,targetCommitish)"; then
+            echo "::error::No release found for $VERSION. Create a draft release first."
+            exit 1
+          fi
+
+          if [[ "$(jq -r '.isDraft' <<< "$release_json")" != "true" ]]; then
+            echo "::error::Release $VERSION is already published. Only draft releases can be updated."
+            exit 1
+          fi
+
+          # A commit SHA (not a branch) keeps the published tag on the commit the binaries were built from.
+          ref="$(jq -r '.targetCommitish' <<< "$release_json")"
+          if [[ ! "$ref" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::Draft release target must be a full commit SHA, got '$ref'. Edit the draft and select a specific commit."
+            exit 1
+          fi
+
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "ref=$ref" >> "$GITHUB_OUTPUT"
 
   base_tests:
     needs: validate
     uses: ./.github/workflows/base-test.yml
+    with:
+      ref: ${{ needs.validate.outputs.ref }}
     permissions:
       contents: read
       checks: write
@@ -37,11 +71,14 @@ jobs:
   build:
     needs: validate
     uses: ./.github/workflows/build.yml
+    with:
+      ref: ${{ needs.validate.outputs.ref }}
+      version: ${{ needs.validate.outputs.version }}
     secrets: inherit
 
   sign_macos:
     name: Sign macOS binaries
-    needs: [base_tests, build]
+    needs: [validate, base_tests, build]
     runs-on: macos-latest
     env:
       GON_VERSION: v0.0.37
@@ -49,6 +86,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          ref: ${{ needs.validate.outputs.ref }}
 
       - name: Download macOS binaries
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
@@ -102,8 +141,8 @@ jobs:
           path: bin/terragrunt-iac-engine-opentofu_darwin_*
           if-no-files-found: error
 
-  release:
-    name: Publish release
+  upload:
+    name: Attach files to draft release
     needs: [validate, sign_macos]
     runs-on: ubuntu-latest
     permissions:
@@ -112,6 +151,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          ref: ${{ needs.validate.outputs.ref }}
 
       - name: Download Linux binaries
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
@@ -144,16 +185,24 @@ jobs:
           VERSION: ${{ needs.validate.outputs.version }}
         run: .github/scripts/package-release.sh bin release "$VERSION"
 
-      - name: Publish GitHub release
+      - name: Attach files to draft release
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           VERSION: ${{ needs.validate.outputs.version }}
         run: |
-          # Raw binaries are listed in SHA256SUMS but only the zips are published.
-          assets=(release/*.zip release/*_SHA256SUMS release/*_SHA256SUMS.sig)
-          if gh release view "$VERSION" > /dev/null 2>&1; then
-            gh release upload "$VERSION" "${assets[@]}" --clobber
-          else
-            gh release create "$VERSION" "${assets[@]}" --target "$GITHUB_SHA" --title "$VERSION" --generate-notes
+          if [[ "$(gh release view "$VERSION" --json isDraft -q .isDraft)" != "true" ]]; then
+            echo "::error::Release $VERSION was published while the workflow was running. Files not attached."
+            exit 1
           fi
+
+          # Raw binaries are listed in SHA256SUMS but only the zips are attached.
+          gh release upload "$VERSION" release/*.zip release/*_SHA256SUMS release/*_SHA256SUMS.sig --clobber
+
+          {
+            echo "## Files attached to draft release $VERSION"
+            echo
+            gh release view "$VERSION" --json assets -q '.assets[] | "- \(.name)"'
+            echo
+            echo "Review the draft and publish it: $(gh release view "$VERSION" --json url -q .url)"
+          } >> "$GITHUB_STEP_SUMMARY"

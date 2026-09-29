@@ -112,25 +112,38 @@ Make sure to set the required environment variable to enable the experimental en
 export TG_EXPERIMENTAL_ENGINE=1
 ```
 
-## Automated Release Process
+## Release Process
 
-To initiate the release process, create a pre-release named using the following naming convention: `vx.y.z-rcdateincrement`, with the appropriate corresponding tag.
+Releases are built from a draft release. Nothing is published until a maintainer reviews the draft and publishes it.
 
-- Example Tag: `v0.0.1-rc2024053001`
-  - `v0.0.1` represents the version number.
-  - `-rc2024053001` indicates a release candidate, with the date and an incrementing identifier.
+1. **Create a draft release.**
+   - In GitHub, open **Releases** > **Draft a new release**.
+   - Create a new tag named after the version, for example `v0.2.0`.
+   - Set **Target** to a specific commit, not a branch. The workflow rejects drafts that target a branch, so the published tag always points at the commit the binaries were built from.
+   - Write the release notes and click **Save draft**.
 
-Workflow:
+   Or from the command line:
 
-- Tag Creation:
-  - Create a pre-release ending with `-rc...` to the repository.
-  - This tag format will automatically trigger the GitHub Actions [Release](.github/workflows/release.yml) workflow.
-- CI/CD Process:
-  - The workflow runs the tests and compiles binaries for all supported platforms.
-  - macOS binaries are signed and notarized.
-- GitHub Release:
-  - The workflow creates the `vx.y.z` GitHub release (without the `-rc...` suffix).
-  - All compiled assets, including checksums and signatures, are uploaded to the release.
+   ```bash
+   gh release create v0.2.0 --draft --title v0.2.0 --target "$(git rev-parse origin/main)" --notes-file notes.md
+   ```
+
+2. **Run the [Release](.github/workflows/release.yml) workflow.** GitHub does not start workflows for draft releases, so start it manually: **Actions** > **Release** > **Run workflow**, and enter the version (for example `v0.2.0`). Or:
+
+   ```bash
+   gh workflow run release.yml -f version=v0.2.0
+   ```
+
+   The workflow:
+   - checks that the draft exists and targets a commit
+   - runs the tests
+   - builds binaries for all supported platforms
+   - signs and notarizes the macOS binaries
+   - attaches the zips, `SHA256SUMS` and its GPG signature to the draft
+
+   If it fails, fix the problem and run it again. Files already on the draft are replaced.
+
+3. **Review and publish.** Check the attached files and the release notes on the draft, then click **Publish release**. Publishing creates the tag.
 
 The Release workflow needs these repository secrets:
 

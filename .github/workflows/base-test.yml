@@ -2,6 +2,11 @@ name: Base Tests
 
 on:
   workflow_call:
+    inputs:
+      ref:
+        description: 'Commit to test (defaults to the triggering commit)'
+        type: string
+        default: ''
 
 jobs:
   test:
@@ -15,6 +20,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          ref: ${{ inputs.ref }}
 
       - name: Use mise to install dependencies
         uses: jdx/mise-action@dad1bfd3df957f44999b559dd69dc1671cb4e9ea # v4.2.1
