@@ -116,7 +116,7 @@ The Release workflow needs these repository secrets, set under **Settings** > **
 3. Set **Target** to a commit SHA, not a branch name. Use the latest commit on `main`, for example. A SHA keeps new commits out of the release between drafting and publishing, and the workflow rejects drafts that target a branch.
 4. Set the release title to the version, for example `v0.2.0`.
 5. Click **Save draft**.
-6. Run the [Release workflow](.github/workflows/release.yml) from **Actions** > **Release** > **Run workflow**, and enter the version. GitHub doesn't start workflows for drafts, so you start this one by hand. The workflow builds the draft's target commit and:
+6. Run the [Release workflow](.github/workflows/release.yml) from **Actions** > **Release** > **Run workflow**, and enter the version. GitHub doesn't start workflows for drafts, so you start this one by hand. The run shows up as `Release v0.2.0`. It builds the draft's target commit and:
    - checks that the version is a valid semantic version
    - checks that the target is a commit SHA, and that an existing tag with the same name points at that commit
    - runs the tests
@@ -129,13 +129,18 @@ The Release workflow needs these repository secrets, set under **Settings** > **
 9. For a stable release, clear **Set as a pre-release** and check **Set as the latest release**. For a pre-release, check **Set as a pre-release**.
 10. Click **Publish release**. Publishing creates the tag at the draft's target commit.
 
-The same steps from the command line:
+The same steps from the command line. First create the draft and build it:
 
 ```bash
 git fetch origin
 gh release create v0.2.0 --draft --title v0.2.0 --target "$(git rev-parse origin/main)" --notes-file notes.md
 gh workflow run release.yml -f version=v0.2.0
-gh run watch "$(gh run list --workflow release.yml -L 1 --json databaseId -q '.[0].databaseId')"
+gh run watch --exit-status    # pick "Release v0.2.0"; exits non-zero if the run fails
+```
+
+Publish only after the run succeeded and the files look right:
+
+```bash
 gh release view v0.2.0 --json assets -q '.assets[].name'
 gh release edit v0.2.0 --draft=false --latest    # for a pre-release: --draft=false --prerelease
 ```
