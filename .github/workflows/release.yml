@@ -1,4 +1,5 @@
 name: Release
+run-name: Release ${{ inputs.version }}
 
 # Builds, signs and attaches release files to an existing draft release.
 # The draft is published manually after review.

@@ -129,7 +129,16 @@ tag_at() {
 
 @test "upload attaches zips, checksums and signature to a valid draft" {
 	draft_targeting "$BUILT_SHA"
+	export GH_STUB_ASSETS=$'engine.zip\nengine_SHA256SUMS\nengine_SHA256SUMS.sig'
 	run "$SCRIPTS/upload-release-assets.sh" "$RELEASE_DIR"
 	[ "$status" -eq 0 ]
 	grep -q "release upload $VERSION $RELEASE_DIR/engine.zip $RELEASE_DIR/engine_SHA256SUMS $RELEASE_DIR/engine_SHA256SUMS.sig --clobber" "$GH_STUB_LOG"
+}
+
+@test "upload fails when a file is missing from the draft after upload" {
+	draft_targeting "$BUILT_SHA"
+	export GH_STUB_ASSETS=$'engine.zip\nengine_SHA256SUMS'
+	run "$SCRIPTS/upload-release-assets.sh" "$RELEASE_DIR"
+	[ "$status" -eq 1 ]
+	[[ "$output" == *"engine_SHA256SUMS.sig is missing"* ]]
 }

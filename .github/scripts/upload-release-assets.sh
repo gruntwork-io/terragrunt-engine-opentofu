@@ -4,7 +4,8 @@
 #
 # Fails without uploading when the release was published, when the draft target changed
 # after the binaries were built, or when the version tag points at another commit, so the
-# files always match the commit the tag will point at.
+# files always match the commit the tag will point at. Fails after uploading when a file
+# is missing from the draft.
 #
 # Usage: upload-release-assets.sh <release-dir>
 #
@@ -41,17 +42,30 @@ function main {
 	"$(dirname "${BASH_SOURCE[0]}")/check-version-tag.sh" "$VERSION" "$EXPECTED_REF"
 
 	# Raw binaries are listed in SHA256SUMS, but only the zips are attached.
-	gh release upload "$VERSION" \
-		"$release_dir"/*.zip \
-		"$release_dir"/*_SHA256SUMS \
-		"$release_dir"/*_SHA256SUMS.sig \
-		--clobber
+	local -a files=("$release_dir"/*.zip "$release_dir"/*_SHA256SUMS "$release_dir"/*_SHA256SUMS.sig)
+	gh release upload "$VERSION" "${files[@]}" --clobber
+
+	# Check that every file made it to the draft.
+	local attached file missing=0
+	attached="$(gh release view "$VERSION" --json assets -q '.assets[].name')"
+	for file in "${files[@]}"; do
+		if ! grep -Fxq "$(basename "$file")" <<<"$attached"; then
+			echo "::error::$(basename "$file") is missing from draft $VERSION after upload. Run the workflow again."
+			missing=1
+		fi
+	done
+
+	if [[ "$missing" -ne 0 ]]; then
+		exit 1
+	fi
 
 	if [[ -n "${GITHUB_STEP_SUMMARY:-}" ]]; then
 		{
 			echo "## Files attached to draft release $VERSION"
 			echo
-			gh release view "$VERSION" --json assets -q '.assets[] | "- \(.name)"'
+			while IFS= read -r file; do
+				echo "- $file"
+			done <<<"$attached"
 			echo
 			echo "Review the draft and publish it: $(jq -r '.url' <<<"$release_json")"
 		} >>"$GITHUB_STEP_SUMMARY"
