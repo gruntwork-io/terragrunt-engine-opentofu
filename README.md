@@ -44,11 +44,11 @@ engine {
   source  = "github.com/gruntwork-io/terragrunt-engine-opentofu"
   // Specify a fixed version if you want to pin a specific engine version instead of always
   // using the latest version of the engine.
-  // version = "v0.0.6"
+  // version = "v0.1.0"
 }
 ```
 
-Pinning the version of the engine is optional, but it's recommended to do so to ensure that you're always using the same version of the engine.
+Pinning the version of the engine is optional, but it's recommended to do so to ensure that you're always using the same version of the engine. The latest version is on the [releases page](https://github.com/gruntwork-io/terragrunt-engine-opentofu/releases/latest). Engine versions `v0.1.0` and later require Terragrunt `v0.99.0` or later.
 
 ### Auto-Install Configuration
 
@@ -174,27 +174,16 @@ If the workflow fails, fix the cause, for example a missing secret, and run the 
 
 ### Pre-releases
 
-Pre-releases use semver pre-release versions:
+Pre-releases use semver pre-release suffixes: `-alpha.N` for early testing, `-beta.N` for broader testing, and `-rcN` for release candidates.
 
-- `v0.2.0-alpha.1`: early testing
-- `v0.2.0-beta.1`: broader testing
-- `v0.2.0-rc1`: release candidate, the last check before the release
-
-Terragrunt ignores pre-releases when it looks up the latest engine, so only users who pin the version get them:
-
-```hcl
-engine {
-  source  = "github.com/gruntwork-io/terragrunt-engine-opentofu"
-  version = "v0.2.0-rc1"
-}
-```
+Terragrunt ignores pre-releases when it looks up the latest engine. Only users who set `version` in the `engine` block to the pre-release version get it.
 
 ### Testing a published release with Terragrunt
 
-Terragrunt checks the `SHA256SUMS` signature and the engine checksum when it downloads and loads an engine. To test a published release end to end, run Terragrunt's engine tests from a checkout of [gruntwork-io/terragrunt](https://github.com/gruntwork-io/terragrunt):
+Terragrunt checks the `SHA256SUMS` signature and the engine checksum when it downloads and loads an engine. To test a published release end to end, run Terragrunt's engine tests from a checkout of [gruntwork-io/terragrunt](https://github.com/gruntwork-io/terragrunt), with the version you released:
 
 ```bash
-TOFU_ENGINE_VERSION=v0.2.0-rc1 go test -tags engine -run '^TestEngine' ./test/...
+TOFU_ENGINE_VERSION=v0.2.0 go test -tags engine -run '^TestEngine' ./test/...
 ```
 
 ## Contributing
