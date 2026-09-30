@@ -16,9 +16,6 @@ concurrency:
   group: release-${{ inputs.version }}
   cancel-in-progress: false
 
-permissions:
-  contents: read
-
 jobs:
   validate:
     name: Validate draft release
