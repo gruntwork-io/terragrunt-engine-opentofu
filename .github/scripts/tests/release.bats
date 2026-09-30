@@ -25,8 +25,8 @@ setup() {
 	touch "$RELEASE_DIR/engine.zip" "$RELEASE_DIR/engine_SHA256SUMS" "$RELEASE_DIR/engine_SHA256SUMS.sig"
 }
 
-release_is() {
-	export GH_STUB_RELEASE="{\"isDraft\":$1,\"isPrerelease\":$2,\"url\":\"https://example.invalid/release\"}"
+draft_targeting() {
+	export GH_STUB_RELEASE="{\"isDraft\":true,\"targetCommitish\":\"$1\",\"url\":\"https://example.invalid/draft\"}"
 }
 
 tag_at() {
@@ -34,68 +34,69 @@ tag_at() {
 	export GH_STUB_TAG_SHA="$1"
 }
 
-# resolve-tag-commit.sh
+# check-version-tag.sh
 
-@test "resolve fails when the tag does not exist" {
-	run "$SCRIPTS/resolve-tag-commit.sh" "$VERSION"
-	[ "$status" -eq 1 ]
-}
-
-@test "resolve ignores tags that only share the version prefix" {
-	export GH_STUB_TAG_REFS="refs/tags/${VERSION}-rc1"
-	run "$SCRIPTS/resolve-tag-commit.sh" "$VERSION"
-	[ "$status" -eq 1 ]
-}
-
-@test "resolve prints the commit the tag points at" {
-	tag_at "$BUILT_SHA"
-	run "$SCRIPTS/resolve-tag-commit.sh" "$VERSION"
+@test "tag check passes when the tag does not exist" {
+	run "$SCRIPTS/check-version-tag.sh" "$VERSION" "$BUILT_SHA"
 	[ "$status" -eq 0 ]
-	[ "$output" = "$BUILT_SHA" ]
+	[[ "$output" == *"does not exist yet"* ]]
 }
 
-# validate-release.sh
+@test "tag check ignores tags that only share the version prefix" {
+	export GH_STUB_TAG_REFS="refs/tags/${VERSION}-rc1"
+	run "$SCRIPTS/check-version-tag.sh" "$VERSION" "$BUILT_SHA"
+	[ "$status" -eq 0 ]
+	[[ "$output" == *"does not exist yet"* ]]
+}
+
+@test "tag check passes when the tag points at the expected commit" {
+	tag_at "$BUILT_SHA"
+	run "$SCRIPTS/check-version-tag.sh" "$VERSION" "$BUILT_SHA"
+	[ "$status" -eq 0 ]
+}
+
+@test "tag check fails when the tag points at another commit" {
+	tag_at "$OTHER_SHA"
+	run "$SCRIPTS/check-version-tag.sh" "$VERSION" "$BUILT_SHA"
+	[ "$status" -eq 1 ]
+	[[ "$output" == *"already exists at $OTHER_SHA"* ]]
+}
+
+# validate-draft-release.sh
 
 @test "validate rejects a version that is not semver" {
 	export VERSION=0.2.0
-	run "$SCRIPTS/validate-release.sh"
+	run "$SCRIPTS/validate-draft-release.sh"
 	[ "$status" -eq 1 ]
 	[[ "$output" == *"not a valid semver tag"* ]]
 }
 
-@test "validate rejects a missing release" {
-	run "$SCRIPTS/validate-release.sh"
+@test "validate rejects a published release" {
+	export GH_STUB_RELEASE="{\"isDraft\":false,\"targetCommitish\":\"$BUILT_SHA\"}"
+	run "$SCRIPTS/validate-draft-release.sh"
 	[ "$status" -eq 1 ]
-	[[ "$output" == *"No release found"* ]]
+	[[ "$output" == *"already published"* ]]
 }
 
-@test "validate rejects a draft" {
-	release_is true true
-	run "$SCRIPTS/validate-release.sh"
+@test "validate rejects a draft that targets a branch" {
+	draft_targeting main
+	run "$SCRIPTS/validate-draft-release.sh"
 	[ "$status" -eq 1 ]
-	[[ "$output" == *"is a draft"* ]]
+	[[ "$output" == *"must be a full commit SHA"* ]]
 }
 
-@test "validate rejects a full release" {
-	release_is false false
-	tag_at "$BUILT_SHA"
-	run "$SCRIPTS/validate-release.sh"
+@test "validate rejects a draft whose existing tag points at another commit" {
+	draft_targeting "$BUILT_SHA"
+	tag_at "$OTHER_SHA"
+	run "$SCRIPTS/validate-draft-release.sh"
 	[ "$status" -eq 1 ]
-	[[ "$output" == *"is a full release"* ]]
+	[[ "$output" == *"already exists at $OTHER_SHA"* ]]
 	[ ! -s "$GITHUB_OUTPUT" ]
 }
 
-@test "validate rejects a pre-release without a tag" {
-	release_is false true
-	run "$SCRIPTS/validate-release.sh"
-	[ "$status" -eq 1 ]
-	[[ "$output" == *"Tag $VERSION does not exist"* ]]
-}
-
-@test "validate writes version and the tag commit for a pre-release" {
-	release_is false true
-	tag_at "$BUILT_SHA"
-	run "$SCRIPTS/validate-release.sh"
+@test "validate writes version and ref for a valid draft" {
+	draft_targeting "$BUILT_SHA"
+	run "$SCRIPTS/validate-draft-release.sh"
 	[ "$status" -eq 0 ]
 	grep -qx "version=$VERSION" "$GITHUB_OUTPUT"
 	grep -qx "ref=$BUILT_SHA" "$GITHUB_OUTPUT"
@@ -103,35 +104,41 @@ tag_at() {
 
 # upload-release-assets.sh
 
-@test "upload refuses a release made a full release during the run" {
-	release_is false false
-	tag_at "$BUILT_SHA"
+@test "upload refuses a release published during the run" {
+	export GH_STUB_RELEASE="{\"isDraft\":false,\"targetCommitish\":\"$BUILT_SHA\",\"url\":\"u\"}"
 	run "$SCRIPTS/upload-release-assets.sh" "$RELEASE_DIR"
 	[ "$status" -eq 1 ]
-	[[ "$output" == *"no longer a pre-release"* ]]
 	! grep -q "release upload" "$GH_STUB_LOG"
 }
 
-@test "upload refuses a tag moved during the run" {
-	release_is false true
+@test "upload refuses a draft whose target changed during the run" {
+	draft_targeting "$OTHER_SHA"
+	run "$SCRIPTS/upload-release-assets.sh" "$RELEASE_DIR"
+	[ "$status" -eq 1 ]
+	[[ "$output" == *"binaries were built from $BUILT_SHA"* ]]
+	! grep -q "release upload" "$GH_STUB_LOG"
+}
+
+@test "upload refuses a tag created at another commit during the run" {
+	draft_targeting "$BUILT_SHA"
 	tag_at "$OTHER_SHA"
 	run "$SCRIPTS/upload-release-assets.sh" "$RELEASE_DIR"
 	[ "$status" -eq 1 ]
-	[[ "$output" == *"now points at $OTHER_SHA"* ]]
 	! grep -q "release upload" "$GH_STUB_LOG"
 }
 
-@test "upload refuses a tag deleted during the run" {
-	release_is false true
-	run "$SCRIPTS/upload-release-assets.sh" "$RELEASE_DIR"
-	[ "$status" -eq 1 ]
-	! grep -q "release upload" "$GH_STUB_LOG"
-}
-
-@test "upload attaches zips, checksums and signature to the pre-release" {
-	release_is false true
-	tag_at "$BUILT_SHA"
+@test "upload attaches zips, checksums and signature to a valid draft" {
+	draft_targeting "$BUILT_SHA"
+	export GH_STUB_ASSETS=$'engine.zip\nengine_SHA256SUMS\nengine_SHA256SUMS.sig'
 	run "$SCRIPTS/upload-release-assets.sh" "$RELEASE_DIR"
 	[ "$status" -eq 0 ]
 	grep -q "release upload $VERSION $RELEASE_DIR/engine.zip $RELEASE_DIR/engine_SHA256SUMS $RELEASE_DIR/engine_SHA256SUMS.sig --clobber" "$GH_STUB_LOG"
+}
+
+@test "upload fails when a file is missing from the draft after upload" {
+	draft_targeting "$BUILT_SHA"
+	export GH_STUB_ASSETS=$'engine.zip\nengine_SHA256SUMS'
+	run "$SCRIPTS/upload-release-assets.sh" "$RELEASE_DIR"
+	[ "$status" -eq 1 ]
+	[[ "$output" == *"engine_SHA256SUMS.sig is missing"* ]]
 }

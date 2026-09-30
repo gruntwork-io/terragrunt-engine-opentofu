@@ -1,21 +1,18 @@
 name: Release
 
-# Runs automatically when a pre-release is published: tests, builds, signs and attaches the
-# release files to it. After review, clear "Set as a pre-release" to make it the latest release.
-# Can also be run manually to rebuild an existing pre-release.
+# Builds, signs and attaches release files to an existing draft release.
+# The draft is published manually after review.
 
 on:
-  release:
-    types: [prereleased]
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version of an existing pre-release, e.g. v0.2.0'
+        description: 'Version of an existing draft release, e.g. v0.2.0'
         required: true
         type: string
 
 concurrency:
-  group: release-${{ inputs.version || github.event.release.tag_name }}
+  group: release-${{ inputs.version }}
   cancel-in-progress: false
 
 permissions:
@@ -23,7 +20,7 @@ permissions:
 
 jobs:
   validate:
-    name: Validate pre-release
+    name: Validate draft release
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.resolve.outputs.version }}
@@ -39,8 +36,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-          VERSION: ${{ inputs.version || github.event.release.tag_name }}
-        run: .github/scripts/validate-release.sh
+          VERSION: ${{ inputs.version }}
+        run: .github/scripts/validate-draft-release.sh
 
   base_tests:
     needs: validate
@@ -69,6 +66,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
+          ref: ${{ needs.validate.outputs.ref }}
           persist-credentials: false
 
       - name: Download macOS binaries
@@ -101,7 +99,7 @@ jobs:
           if-no-files-found: error
 
   upload:
-    name: Attach files to pre-release
+    name: Attach files to draft release
     needs: [validate, sign_macos]
     runs-on: ubuntu-latest
     permissions:
@@ -111,6 +109,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
+          ref: ${{ needs.validate.outputs.ref }}
           persist-credentials: false
 
       - name: Download Linux binaries
@@ -144,7 +143,7 @@ jobs:
           VERSION: ${{ needs.validate.outputs.version }}
         run: .github/scripts/package-release.sh bin release "$VERSION"
 
-      - name: Attach files to pre-release
+      - name: Attach files to draft release
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}

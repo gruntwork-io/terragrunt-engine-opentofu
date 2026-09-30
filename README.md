@@ -112,35 +112,15 @@ Make sure to set the required environment variable to enable the experimental en
 export TG_EXPERIMENTAL_ENGINE=1
 ```
 
-## Release Process
+## Releasing
 
-Publishing a pre-release starts the release automatically. Terragrunt ignores pre-releases when it looks for the latest engine, so users get the new version only after it is made the latest release.
+Releases use [semantic versions](https://semver.org/) and follow the same process as [Terragrunt releases](https://terragrunt.gruntwork.io/docs/process/releases/): the release is built into a **draft**, a maintainer checks it, and publishing makes it available. Nothing reaches users before the draft is published.
 
-1. **Publish a pre-release.**
-   - In GitHub, open **Releases** > **Draft a new release**.
-   - Create a new tag named after the version, for example `v0.2.0`, on `main`.
-   - Write the release notes.
-   - Check **Set as a pre-release** and click **Publish release**.
+Immutable releases are not enabled for this repository yet. The process does not depend on them: all files are attached before the release is published.
 
-   Or from the command line:
+### Before the first release
 
-   ```bash
-   gh release create v0.2.0 --prerelease --title v0.2.0 --target main --notes-file notes.md
-   ```
-
-   Saving a draft does not start anything, because GitHub does not run workflows for drafts.
-
-2. **Wait for the [Release](.github/workflows/release.yml) workflow.** It starts automatically and:
-   - runs the tests on the commit the tag points at
-   - builds binaries for all supported platforms from that commit
-   - signs and notarizes the macOS binaries
-   - attaches the zips, `SHA256SUMS` and its GPG signature to the pre-release
-
-   If it fails, for example because a secret is missing, fix the problem, open the failed run and click **Re-run all jobs**. Files with the same names are replaced.
-
-3. **Make it the latest release.** Check the attached files and the release notes, then edit the release, clear **Set as a pre-release** and save.
-
-The Release workflow needs these repository secrets:
+The Release workflow needs these repository secrets, set under **Settings** > **Secrets and variables** > **Actions**:
 
 | Secret | Purpose |
 |---|---|
@@ -150,6 +130,72 @@ The Release workflow needs these repository secrets:
 | `MACOS_AC_PROVIDER` | Apple notarization provider (team) |
 | `GW_ENGINE_GPG_KEY` | Engine GPG private key, base64 encoded, used to sign `SHA256SUMS` |
 | `GW_ENGINE_GPG_KEY_PW` | Passphrase of the engine GPG key |
+
+`GW_ENGINE_GPG_KEY` must be the key Terragrunt checks engine signatures with, fingerprint `1B73A8002338C2BB28DB30F4AF5968DA739BFC5C`. Terragrunt rejects engines signed with any other key.
+
+### How to create a new release
+
+1. Go to the [Releases page](https://github.com/gruntwork-io/terragrunt-engine-opentofu/releases) and click **Draft a new release**.
+2. In **Choose a tag**, enter the version, for example `v0.2.0`, and select **Create new tag: v0.2.0 on publish**.
+3. Set **Target** to an explicit commit SHA, not a branch name, for example the latest commit on `main`. This keeps new commits out of the release between drafting and publishing. The workflow rejects drafts that target a branch.
+4. Set the release title to the version, for example `v0.2.0`.
+5. Click **Save draft**.
+6. Run the [Release workflow](.github/workflows/release.yml): **Actions** > **Release** > **Run workflow**, and enter the version, for example `v0.2.0`. GitHub does not start workflows for drafts, so this step is manual. The workflow reads the draft's target commit and:
+   - checks that the version is a valid semantic version
+   - checks that the target is a commit SHA, and that an existing tag with the same name points at that commit
+   - runs the tests
+   - builds binaries for all supported platforms
+   - signs and notarizes the macOS binaries
+   - generates `SHA256SUMS` and signs it with the engine GPG key
+   - attaches the zips, `SHA256SUMS` and its signature to the draft, and checks that all of them are there
+7. When the workflow succeeds, open the draft and check the attached files: seven zips, `SHA256SUMS` and `SHA256SUMS.sig`.
+8. Write or finish the release notes.
+9. When ready:
+   - for a stable release, clear **Set as a pre-release** and check **Set as the latest release**
+   - for a pre-release, check **Set as a pre-release**
+10. Click **Publish release**. This creates the tag at the draft's target commit.
+
+The same steps from the command line:
+
+```bash
+git fetch origin
+gh release create v0.2.0 --draft --title v0.2.0 --target "$(git rev-parse origin/main)" --notes-file notes.md
+gh workflow run release.yml -f version=v0.2.0
+gh run watch "$(gh run list --workflow release.yml -L 1 --json databaseId -q '.[0].databaseId')"
+gh release view v0.2.0 --json assets -q '.assets[].name'
+gh release edit v0.2.0 --draft=false --latest    # for a pre-release: --draft=false --prerelease
+```
+
+If you edit the draft, for example to target a newer commit, run the Release workflow again with the same version. Editing a draft does not start a new build.
+
+### Retrying a failed build
+
+If the workflow fails, fix the cause, for example a missing secret, and run the Release workflow again with the same version. It rebuilds and replaces the files already on the draft. Files with other names stay on the draft; delete them by hand.
+
+### Pre-releases
+
+Pre-releases use semver pre-release versions:
+
+- `v0.2.0-alpha.1`: early testing
+- `v0.2.0-beta.1`: broader testing
+- `v0.2.0-rc1`: release candidate, the last check before the release
+
+Terragrunt ignores pre-releases when it looks up the latest engine, so only users who pin the version get them:
+
+```hcl
+engine {
+  source  = "github.com/gruntwork-io/terragrunt-engine-opentofu"
+  version = "v0.2.0-rc1"
+}
+```
+
+### Testing a published release with Terragrunt
+
+Terragrunt checks the `SHA256SUMS` signature and the engine checksum when it downloads and loads an engine. To test a published release end to end, run Terragrunt's engine tests from a checkout of [gruntwork-io/terragrunt](https://github.com/gruntwork-io/terragrunt):
+
+```bash
+TOFU_ENGINE_VERSION=v0.2.0-rc1 go test -tags engine -run '^TestEngine' ./test/...
+```
 
 ## Contributing
 
