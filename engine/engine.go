@@ -4,6 +4,7 @@ package engine
 import (
 	"bufio"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -24,6 +25,8 @@ import (
 	"golang.org/x/text/encoding/unicode"
 	"golang.org/x/text/transform"
 	"google.golang.org/grpc"
+	"google.golang.org/protobuf/types/known/anypb"
+	"google.golang.org/protobuf/types/known/structpb"
 )
 
 const (
@@ -69,22 +72,8 @@ func (c *TofuEngine) Init(req *tgengine.InitRequest, stream tgengine.Engine_Init
 		return err
 	}
 
-	version := ""
-	installDir := ""
-
-	if req.GetMeta() != nil {
-		if versionAny, exists := req.GetMeta()["tofu_version"]; exists {
-			if stringValue := versionAny.GetValue(); stringValue != nil {
-				version = string(stringValue)
-			}
-		}
-
-		if installDirAny, exists := req.GetMeta()["tofu_install_dir"]; exists {
-			if stringValue := installDirAny.GetValue(); stringValue != nil {
-				installDir = string(stringValue)
-			}
-		}
-	}
+	version := metaString(req.GetMeta()["tofu_version"])
+	installDir := metaString(req.GetMeta()["tofu_install_dir"])
 
 	if version != "" {
 		log.Debugf("Downloading OpenTofu binary (version: %s)...", version)
@@ -142,6 +131,30 @@ func (c *TofuEngine) Init(req *tgengine.InitRequest, stream tgengine.Engine_Init
 	}
 
 	return nil
+}
+
+// metaString returns the string value of an engine meta entry.
+//
+// Terragrunt sends each meta value as a JSON-encoded string wrapped in a google.protobuf.Value
+// (see ConvertMetaToProtobuf in Terragrunt). Values without that wrapper are read as raw bytes.
+func metaString(value *anypb.Any) string {
+	if value == nil {
+		return ""
+	}
+
+	var protoValue structpb.Value
+	if err := value.UnmarshalTo(&protoValue); err != nil {
+		return string(value.GetValue())
+	}
+
+	raw := protoValue.GetStringValue()
+
+	var decoded string
+	if err := json.Unmarshal([]byte(raw), &decoded); err != nil {
+		return raw
+	}
+
+	return decoded
 }
 
 const (

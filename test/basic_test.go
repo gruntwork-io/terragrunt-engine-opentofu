@@ -2,6 +2,7 @@ package integration_test
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -19,6 +20,7 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/test/bufconn"
 	"google.golang.org/protobuf/types/known/anypb"
+	"google.golang.org/protobuf/types/known/structpb"
 )
 
 const (
@@ -26,13 +28,20 @@ const (
 	versionCmd = "version"
 )
 
-// Helper function to create anypb.Any from a string value
+// createStringAny encodes a meta value the way Terragrunt sends it: a JSON-encoded string
+// wrapped in a google.protobuf.Value (see ConvertMetaToProtobuf in Terragrunt).
 func createStringAny(value string) (*anypb.Any, error) {
-	anyValue := &anypb.Any{
-		Value: []byte(value),
+	jsonData, err := json.Marshal(value)
+	if err != nil {
+		return nil, err
 	}
 
-	return anyValue, nil
+	protoValue, err := structpb.NewValue(string(jsonData))
+	if err != nil {
+		return nil, err
+	}
+
+	return anypb.New(protoValue)
 }
 
 func TestRun(t *testing.T) {
