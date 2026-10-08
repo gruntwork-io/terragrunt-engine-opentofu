@@ -2,6 +2,9 @@ package engine_test
 
 import (
 	"context"
+	"encoding/json"
+	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -14,6 +17,8 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/metadata"
+	"google.golang.org/protobuf/types/known/anypb"
+	"google.golang.org/protobuf/types/known/structpb"
 )
 
 // MockInitServer is a mock implementation of the InitServer interface
@@ -121,7 +126,7 @@ func (m *MockShutdownServer) RecvMsg(msg any) error {
 func TestTofuEngine_Init(t *testing.T) {
 	t.Parallel()
 
-	engine := &engine.TofuEngine{}
+	engine := &engine.TofuEngine{PluginCacheDir: t.TempDir()}
 	mockStream := &MockInitServer{}
 
 	err := engine.Init(&tgengine.InitRequest{}, mockStream)
@@ -131,6 +136,69 @@ func TestTofuEngine_Init(t *testing.T) {
 	assert.Equal(t, "Tofu Initialization started", mockStream.Responses[0].GetLog().GetContent())
 	assert.NotNil(t, mockStream.Responses[1].GetLog())
 	assert.Equal(t, "Tofu Initialization completed", mockStream.Responses[1].GetLog().GetContent())
+}
+
+func TestTofuEngine_InitRejectsNonBooleanNoAutoProviderCacheDir(t *testing.T) {
+	t.Parallel()
+
+	value, err := anypb.New(structpb.NewStringValue(`"sometimes"`))
+	require.NoError(t, err)
+
+	engine := &engine.TofuEngine{PluginCacheDir: t.TempDir()}
+	mockStream := &MockInitServer{}
+
+	err = engine.Init(&tgengine.InitRequest{
+		Meta: map[string]*anypb.Any{"no_auto_provider_cache_dir": value},
+	}, mockStream)
+	require.ErrorIs(t, err, strconv.ErrSyntax)
+
+	require.Len(t, mockStream.Responses, 3)
+	assert.Equal(t, int32(1), mockStream.Responses[2].GetExitResult().GetCode())
+}
+
+func TestTofuEngine_InitRejectsTFPathWithTofuVersion(t *testing.T) {
+	t.Parallel()
+
+	tfPath, err := anypb.New(structpb.NewStringValue(`"tofu"`))
+	require.NoError(t, err)
+
+	version, err := anypb.New(structpb.NewStringValue(`"v1.11.2"`))
+	require.NoError(t, err)
+
+	eng := &engine.TofuEngine{PluginCacheDir: t.TempDir()}
+	mockStream := &MockInitServer{}
+
+	err = eng.Init(&tgengine.InitRequest{
+		Meta: map[string]*anypb.Any{"tf_path": tfPath, "tofu_version": version},
+	}, mockStream)
+	require.ErrorIs(t, err, engine.ErrConflictingMeta)
+
+	require.Len(t, mockStream.Responses, 3)
+	assert.Equal(t, int32(1), mockStream.Responses[2].GetExitResult().GetCode())
+}
+
+func TestTofuEngine_InitRejectsMissingTFPath(t *testing.T) {
+	t.Parallel()
+
+	missing, err := json.Marshal(filepath.Join(t.TempDir(), "tofu"))
+	require.NoError(t, err)
+
+	tfPath, err := anypb.New(structpb.NewStringValue(string(missing)))
+	require.NoError(t, err)
+
+	eng := &engine.TofuEngine{PluginCacheDir: t.TempDir()}
+	mockStream := &MockInitServer{}
+
+	err = eng.Init(&tgengine.InitRequest{
+		Meta: map[string]*anypb.Any{"tf_path": tfPath},
+	}, mockStream)
+
+	var lookPathErr *exec.Error
+
+	require.ErrorAs(t, err, &lookPathErr)
+
+	require.Len(t, mockStream.Responses, 3)
+	assert.Equal(t, int32(1), mockStream.Responses[2].GetExitResult().GetCode())
 }
 
 func TestTofuEngine_Run(t *testing.T) {
