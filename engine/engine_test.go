@@ -3,7 +3,6 @@ package engine_test
 import (
 	"context"
 	"encoding/json"
-	"io/fs"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -193,7 +192,10 @@ func TestTofuEngine_InitRejectsMissingTFPath(t *testing.T) {
 	err = eng.Init(&tgengine.InitRequest{
 		Meta: map[string]*anypb.Any{"tf_path": tfPath},
 	}, mockStream)
-	require.ErrorIs(t, err, fs.ErrNotExist)
+
+	var lookPathErr *exec.Error
+
+	require.ErrorAs(t, err, &lookPathErr)
 
 	require.Len(t, mockStream.Responses, 3)
 	assert.Equal(t, int32(1), mockStream.Responses[2].GetExitResult().GetCode())
