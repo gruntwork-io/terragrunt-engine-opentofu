@@ -42,6 +42,9 @@ const (
 	// metaNoAutoProviderCacheDir matches Terragrunt's --no-auto-provider-cache-dir flag.
 	metaNoAutoProviderCacheDir = "no_auto_provider_cache_dir"
 
+	// metaTFPath matches Terragrunt's --tf-path flag.
+	metaTFPath = "tf_path"
+
 	versionProbeTimeout = 30 * time.Second
 	versionProbeMaxSize = 1 << 20
 
@@ -55,6 +58,9 @@ const (
 var ErrPluginCacheUnsupported = errors.New(
 	"OpenTofu older than 1.10 cannot share a plugin cache between concurrent runs",
 )
+
+// ErrConflictingMeta reports engine meta attributes that cannot be set together.
+var ErrConflictingMeta = errors.New("conflicting engine meta")
 
 // TofuEngine runs OpenTofu on the machine Terragrunt runs on.
 type TofuEngine struct {
@@ -101,13 +107,18 @@ func (c *TofuEngine) getRunPluginCacheDir() string {
 	return c.runPluginCacheDir
 }
 
-// Init picks the OpenTofu binary for later runs, downloading it when the meta names a tofu_version.
+// Init picks the OpenTofu binary for later runs. It downloads the binary when the meta names a
+// tofu_version, uses the one at tf_path when the meta names that, and otherwise uses tofu from PATH.
 //
 // When that binary is OpenTofu 1.10 or newer, later runs share one provider cache, so units
 // running in parallel do not each download their own copy of a provider. A true
 // no_auto_provider_cache_dir in the meta turns the shared cache off.
 //
 // Returns an error wrapping [strconv.ErrSyntax] when no_auto_provider_cache_dir is not a boolean.
+//
+// Returns [ErrConflictingMeta] when the meta names both tf_path and tofu_version.
+//
+// Returns the [exec.LookPath] error when tf_path names no executable.
 func (c *TofuEngine) Init(req *tgengine.InitRequest, stream tgengine.Engine_InitServer) error {
 	log.Debug("Init Tofu plugin")
 
@@ -130,7 +141,17 @@ func (c *TofuEngine) Init(req *tgengine.InitRequest, stream tgengine.Engine_Init
 	version := metaString(req.GetMeta()["tofu_version"])
 	installDir := metaString(req.GetMeta()["tofu_install_dir"])
 
-	if version != "" {
+	tfPath := metaString(req.GetMeta()[metaTFPath])
+
+	if tfPath != "" && version != "" {
+		return failInit(
+			stream,
+			fmt.Errorf("%w: set %s or tofu_version, not both", ErrConflictingMeta, metaTFPath),
+		)
+	}
+
+	switch {
+	case version != "":
 		log.Debugf("Downloading OpenTofu binary (version: %s)...", version)
 
 		binaryPath, downloadErr := c.downloadOpenTofu(version, installDir)
@@ -143,7 +164,16 @@ func (c *TofuEngine) Init(req *tgengine.InitRequest, stream tgengine.Engine_Init
 		c.setBinaryPath(binaryPath)
 
 		log.Debugf("OpenTofu binary downloaded to: %s\n", binaryPath)
-	} else {
+	case tfPath != "":
+		binaryPath, err := resolveTFPath(tfPath)
+		if err != nil {
+			return failInit(stream, err)
+		}
+
+		c.setBinaryPath(binaryPath)
+
+		log.Debugf("Using OpenTofu binary from %s: %s", metaTFPath, binaryPath)
+	default:
 		c.setBinaryPath(iacCommand)
 
 		log.Debug("Using system OpenTofu binary (no version specified)")
@@ -198,6 +228,24 @@ func failInit(stream tgengine.Engine_InitServer, initErr error) error {
 	}
 
 	return initErr
+}
+
+// resolveTFPath returns the absolute path of the executable that tfPath names, searching PATH
+// when tfPath has no directory part.
+func resolveTFPath(tfPath string) (string, error) {
+	found, err := exec.LookPath(tfPath)
+	if err != nil {
+		return "", fmt.Errorf("invalid %s in engine meta: %w", metaTFPath, err)
+	}
+
+	// Run starts the binary from the unit's working directory, where a relative path
+	// would name a different file.
+	binaryPath, err := filepath.Abs(found)
+	if err != nil {
+		return "", fmt.Errorf("invalid %s in engine meta: %w", metaTFPath, err)
+	}
+
+	return binaryPath, nil
 }
 
 // metaBool returns the boolean value of the engine meta entry named key, and false when the meta has no such entry.

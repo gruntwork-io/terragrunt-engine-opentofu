@@ -9,6 +9,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -260,6 +261,54 @@ func TestAutoInstallWithCustomInstallDir(t *testing.T) {
 	defer func() {
 		_ = os.RemoveAll(installDir)
 	}()
+}
+
+func TestTFPathRunsTheNamedBinary(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+
+	installDir := t.TempDir()
+
+	versionAny, err := createStringAny("v1.9.1")
+	require.NoError(t, err)
+
+	installDirAny, err := createStringAny(installDir)
+	require.NoError(t, err)
+
+	_, _, err = runTofuCommandWithInit(
+		t,
+		ctx,
+		&engine.TofuEngine{PluginCacheDir: t.TempDir()},
+		"tofu",
+		[]string{versionCmd},
+		"fixture-basic-project",
+		map[string]string{},
+		map[string]*anypb.Any{tofuVersionMeta: versionAny, "tofu_install_dir": installDirAny},
+	)
+	require.NoError(t, err)
+
+	binaryName := "tofu"
+	if runtime.GOOS == "windows" {
+		binaryName += ".exe"
+	}
+
+	tfPathAny, err := createStringAny(filepath.Join(installDir, binaryName))
+	require.NoError(t, err)
+
+	stdout, stderr, err := runTofuCommandWithInit(
+		t,
+		ctx,
+		&engine.TofuEngine{PluginCacheDir: t.TempDir()},
+		"tofu",
+		[]string{versionCmd},
+		"fixture-basic-project",
+		map[string]string{},
+		map[string]*anypb.Any{"tf_path": tfPathAny},
+	)
+	require.NoError(t, err)
+
+	require.Empty(t, stderr)
+	assert.Contains(t, stdout, "OpenTofu v1.9.1")
 }
 
 func TestPluginCacheSharing(t *testing.T) {

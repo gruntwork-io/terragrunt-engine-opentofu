@@ -6,7 +6,13 @@ OpenTofu IaC engine for [Terragrunt](https://github.com/gruntwork-io/terragrunt)
 
 Without an engine, Terragrunt runs the Terraform or OpenTofu CLI itself. An IaC engine moves that work into a separate plugin. Terragrunt starts the plugin and talks to it over RPC, so the plugin can change and ship without a Terragrunt release.
 
-This is the first engine. It runs OpenTofu on your machine and does what Terragrunt does without an engine. Other engines can do more, for example run OpenTofu on a remote machine.
+Engines are an experimental Terragrunt feature. Turn them on with `--experiment iac-engine` or `--experiment-mode`:
+
+```bash
+export TG_EXPERIMENT=iac-engine
+```
+
+This is the flagship IaC engine for Terragrunt. It runs OpenTofu on your machine and basically does what Terragrunt does without an engine.
 
 To write your own engine, start from [terragrunt-engine-go](https://github.com/gruntwork-io/terragrunt-engine-go) and use this repository as an example. The design is in the [Terragrunt IaC engine RFC](https://github.com/gruntwork-io/terragrunt/issues/3103).
 
@@ -16,7 +22,7 @@ To write your own engine, start from [terragrunt-engine-go](https://github.com/g
 
 The engine can download OpenTofu for you with the [tofudl library](https://github.com/opentofu/tofudl). You don't have to install OpenTofu yourself, and every machine runs the same version.
 
-- Without `tofu_version`, the engine uses the `tofu` binary on your `PATH`.
+- Without `tofu_version`, the engine uses the `tofu` binary on your `PATH`, or the one you set with `tf_path`.
 - With `tofu_version`, the engine downloads that version once and caches it in `~/.cache/terragrunt/tofudl/`. Later runs reuse the cached binary.
 - A file lock stops parallel Terragrunt runs from downloading the same version at the same time.
 
@@ -61,28 +67,36 @@ engine {
 
 - `tofu_version` is the OpenTofu version to download, such as `"v1.9.1"` or `"1.8.5"`, or `"latest"` for the latest stable release. Without it, the engine uses the `tofu` binary on your `PATH`.
 - `tofu_install_dir` is where the engine puts the binary. The default is `~/.cache/terragrunt/tofudl/bin/<version>/`.
+- `tf_path` is an OpenTofu binary you installed yourself, as an absolute path or a command name on your `PATH`. You can't set it together with `tofu_version`.
 - `no_auto_provider_cache_dir` turns off the [shared provider cache](#shared-provider-cache) when `true`. The default is `false`.
 
-Examples:
+## Examples
+
+### Use the latest stable version of OpenTofu
 
 ```hcl
-# Use latest stable OpenTofu version
 engine {
   source = "github.com/gruntwork-io/terragrunt-engine-opentofu"
   meta = {
     tofu_version = "latest"
   }
 }
+```
 
-# Use specific OpenTofu version
+### Use a specific version of OpenTofu
+
+```hcl
 engine {
   source = "github.com/gruntwork-io/terragrunt-engine-opentofu"
   meta = {
     tofu_version = "v1.9.1"
   }
 }
+```
 
-# Use specific version with custom install directory
+### Use a specific version of OpenTofu with a custom install directory
+
+```hcl
 engine {
   source = "github.com/gruntwork-io/terragrunt-engine-opentofu"
   meta = {
@@ -92,10 +106,15 @@ engine {
 }
 ```
 
-Engines are an experimental Terragrunt feature. Turn them on with this environment variable, or run Terragrunt with `--experiment iac-engine`:
+### Use an OpenTofu binary you installed yourself
 
-```bash
-export TG_EXPERIMENTAL_ENGINE=1
+```hcl
+engine {
+  source = "github.com/gruntwork-io/terragrunt-engine-opentofu"
+  meta = {
+    tf_path = "/usr/local/bin/tofu"
+  }
+}
 ```
 
 ## Releasing
