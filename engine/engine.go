@@ -3,6 +3,7 @@ package engine
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -12,6 +13,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -34,12 +36,34 @@ const (
 	iacCommand      = "tofu"
 	errorResultCode = 1
 	installDirMode  = 0755
+
+	envPluginCacheDir = "TF_PLUGIN_CACHE_DIR"
+	// metaNoAutoProviderCacheDir matches Terragrunt's --no-auto-provider-cache-dir flag.
+	metaNoAutoProviderCacheDir = "no_auto_provider_cache_dir"
+
+	versionProbeTimeout = 30 * time.Second
+	versionProbeMaxSize = 1 << 20
+
+	// OpenTofu locks the plugin cache from 1.10 on. Older versions corrupt it when
+	// several runs install the same provider at once.
+	pluginCacheMinMajor = 1
+	pluginCacheMinMinor = 10
 )
 
+// ErrPluginCacheUnsupported reports an OpenTofu version that cannot share a plugin cache between concurrent runs.
+var ErrPluginCacheUnsupported = errors.New("OpenTofu older than 1.10 cannot share a plugin cache between concurrent runs")
+
+// TofuEngine runs OpenTofu on the machine Terragrunt runs on.
 type TofuEngine struct {
 	tgengine.UnimplementedEngineServer
-	binaryPath string
-	mu         sync.RWMutex
+
+	// PluginCacheDir is the provider cache that every run of this engine shares.
+	// Empty means the providers directory in Terragrunt's user cache directory.
+	PluginCacheDir string
+
+	binaryPath        string
+	runPluginCacheDir string
+	mu                sync.RWMutex
 }
 
 // setBinaryPath safely sets the binary path
@@ -58,6 +82,29 @@ func (c *TofuEngine) getBinaryPath() string {
 	return c.binaryPath
 }
 
+// setRunPluginCacheDir safely sets the plugin cache directory that Run passes to OpenTofu
+func (c *TofuEngine) setRunPluginCacheDir(dir string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	c.runPluginCacheDir = dir
+}
+
+// getRunPluginCacheDir safely gets the plugin cache directory that Run passes to OpenTofu
+func (c *TofuEngine) getRunPluginCacheDir() string {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	return c.runPluginCacheDir
+}
+
+// Init picks the OpenTofu binary for later runs, downloading it when the meta names a tofu_version.
+//
+// When that binary is OpenTofu 1.10 or newer, later runs share one provider cache, so units
+// running in parallel do not each download their own copy of a provider. A true
+// no_auto_provider_cache_dir in the meta turns the shared cache off.
+//
+// Returns an error wrapping [strconv.ErrSyntax] when no_auto_provider_cache_dir is not a boolean.
 func (c *TofuEngine) Init(req *tgengine.InitRequest, stream tgengine.Engine_InitServer) error {
 	log.Debug("Init Tofu plugin")
 
@@ -72,6 +119,11 @@ func (c *TofuEngine) Init(req *tgengine.InitRequest, stream tgengine.Engine_Init
 		return err
 	}
 
+	noAutoProviderCacheDir, err := metaBool(req.GetMeta(), metaNoAutoProviderCacheDir)
+	if err != nil {
+		return failInit(stream, err)
+	}
+
 	version := metaString(req.GetMeta()["tofu_version"])
 	installDir := metaString(req.GetMeta()["tofu_install_dir"])
 
@@ -82,30 +134,7 @@ func (c *TofuEngine) Init(req *tgengine.InitRequest, stream tgengine.Engine_Init
 		if downloadErr != nil {
 			log.Errorf("Failed to download OpenTofu: %v\n", downloadErr)
 
-			if err := stream.Send(
-				&tgengine.InitResponse{
-					Response: &tgengine.InitResponse_Log{
-						Log: &tgengine.LogMessage{
-							Content: downloadErr.Error(),
-							Level:   tgengine.LogLevel_LOG_LEVEL_ERROR,
-						},
-					},
-				},
-			); err != nil {
-				return err
-			}
-
-			if err := stream.Send(
-				&tgengine.InitResponse{
-					Response: &tgengine.InitResponse_ExitResult{
-						ExitResult: &tgengine.ExitResultMessage{Code: errorResultCode},
-					},
-				},
-			); err != nil {
-				return err
-			}
-
-			return downloadErr
+			return failInit(stream, downloadErr)
 		}
 
 		c.setBinaryPath(binaryPath)
@@ -116,6 +145,17 @@ func (c *TofuEngine) Init(req *tgengine.InitRequest, stream tgengine.Engine_Init
 
 		log.Debug("Using system OpenTofu binary (no version specified)")
 	}
+
+	pluginCacheDir := ""
+
+	if !noAutoProviderCacheDir {
+		pluginCacheDir, err = c.sharedPluginCacheDir(stream.Context())
+		if err != nil {
+			log.Debugf("Runs do not share a plugin cache: %v", err)
+		}
+	}
+
+	c.setRunPluginCacheDir(pluginCacheDir)
 
 	log.Debug("Engine Initialization completed")
 
@@ -131,6 +171,45 @@ func (c *TofuEngine) Init(req *tgengine.InitRequest, stream tgengine.Engine_Init
 	}
 
 	return nil
+}
+
+// failInit reports initErr to Terragrunt as an error log and a failed exit result, then returns it.
+func failInit(stream tgengine.Engine_InitServer, initErr error) error {
+	if err := stream.Send(&tgengine.InitResponse{
+		Response: &tgengine.InitResponse_Log{
+			Log: &tgengine.LogMessage{
+				Content: initErr.Error(),
+				Level:   tgengine.LogLevel_LOG_LEVEL_ERROR,
+			},
+		},
+	}); err != nil {
+		return err
+	}
+
+	if err := stream.Send(&tgengine.InitResponse{
+		Response: &tgengine.InitResponse_ExitResult{
+			ExitResult: &tgengine.ExitResultMessage{Code: errorResultCode},
+		},
+	}); err != nil {
+		return err
+	}
+
+	return initErr
+}
+
+// metaBool returns the boolean value of the engine meta entry named key, and false when the meta has no such entry.
+func metaBool(meta map[string]*anypb.Any, key string) (bool, error) {
+	raw := metaString(meta[key])
+	if raw == "" {
+		return false, nil
+	}
+
+	value, err := strconv.ParseBool(raw)
+	if err != nil {
+		return false, fmt.Errorf("invalid %s in engine meta: %w", key, err)
+	}
+
+	return value, nil
 }
 
 // metaString returns the string value of an engine meta entry.
@@ -155,6 +234,82 @@ func metaString(value *anypb.Any) string {
 	}
 
 	return decoded
+}
+
+// sharedPluginCacheDir returns the plugin cache directory for the binary Init picked, creating it if needed.
+//
+// Returns [ErrPluginCacheUnsupported] when the binary is older than OpenTofu 1.10.
+func (c *TofuEngine) sharedPluginCacheDir(ctx context.Context) (string, error) {
+	major, minor, err := tofuVersion(ctx, c.getBinaryPath())
+	if err != nil {
+		return "", err
+	}
+
+	if major < pluginCacheMinMajor || (major == pluginCacheMinMajor && minor < pluginCacheMinMinor) {
+		return "", fmt.Errorf("%w: found %d.%d", ErrPluginCacheUnsupported, major, minor)
+	}
+
+	dir := c.PluginCacheDir
+	if dir == "" {
+		userCacheDir, err := os.UserCacheDir()
+		if err != nil {
+			return "", fmt.Errorf("failed to get user cache directory: %w", err)
+		}
+
+		// Terragrunt's default provider cache directory, so runs with and without the engine share downloads.
+		dir = filepath.Join(userCacheDir, "terragrunt", "providers")
+	}
+
+	if err := os.MkdirAll(dir, installDirMode); err != nil {
+		return "", fmt.Errorf("failed to create plugin cache directory: %w", err)
+	}
+
+	return dir, nil
+}
+
+// tofuVersion returns the major and minor version that the binary at binaryPath reports.
+func tofuVersion(ctx context.Context, binaryPath string) (major, minor int, err error) {
+	ctx, cancel := context.WithTimeout(ctx, versionProbeTimeout)
+	defer cancel()
+
+	var stdout bytes.Buffer
+
+	cmd := exec.CommandContext(ctx, binaryPath, "version", "-json")
+	cmd.Stdout = &limitedWriter{w: &stdout, remaining: versionProbeMaxSize}
+
+	if err := cmd.Run(); err != nil {
+		return 0, 0, fmt.Errorf("failed to run %s version: %w", iacCommand, err)
+	}
+
+	var output struct {
+		Version string `json:"terraform_version"`
+	}
+
+	if err := json.Unmarshal(stdout.Bytes(), &output); err != nil {
+		return 0, 0, fmt.Errorf("failed to parse %s version output: %w", iacCommand, err)
+	}
+
+	if _, err := fmt.Sscanf(output.Version, "%d.%d", &major, &minor); err != nil {
+		return 0, 0, fmt.Errorf("failed to parse %s version %q: %w", iacCommand, output.Version, err)
+	}
+
+	return major, minor, nil
+}
+
+// limitedWriter writes to w until remaining reaches zero, then fails with [io.ErrShortWrite].
+type limitedWriter struct {
+	w         io.Writer
+	remaining int
+}
+
+func (l *limitedWriter) Write(p []byte) (int, error) {
+	if len(p) > l.remaining {
+		return 0, io.ErrShortWrite
+	}
+
+	l.remaining -= len(p)
+
+	return l.w.Write(p)
 }
 
 const (
@@ -386,6 +541,14 @@ func (c *TofuEngine) Run(req *tgengine.RunRequest, stream tgengine.Engine_RunSer
 	env := make([]string, 0, len(req.GetEnvVars()))
 	for key, value := range req.GetEnvVars() {
 		env = append(env, fmt.Sprintf("%s=%s", key, value))
+	}
+
+	// Terragrunt's provider cache server sends the variable empty to turn tofu's own
+	// cache off, so a request that names it at all keeps its value.
+	if _, ok := req.GetEnvVars()[envPluginCacheDir]; !ok {
+		if dir := c.getRunPluginCacheDir(); dir != "" {
+			env = append(env, envPluginCacheDir+"="+dir)
+		}
 	}
 
 	cmd.Env = append(cmd.Env, env...)

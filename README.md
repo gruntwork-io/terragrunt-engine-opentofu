@@ -20,6 +20,14 @@ The engine can download OpenTofu for you with the [tofudl library](https://githu
 - With `tofu_version`, the engine downloads that version once and caches it in `~/.cache/terragrunt/tofudl/`. Later runs reuse the cached binary.
 - A file lock stops parallel Terragrunt runs from downloading the same version at the same time.
 
+### Shared provider cache
+
+With OpenTofu 1.10 or newer, the engine sets `TF_PLUGIN_CACHE_DIR` to the `terragrunt/providers` directory in your user cache directory, the same one Terragrunt uses without an engine. Units in a `run --all` then share one copy of each provider, where each would otherwise download its own.
+
+- With older OpenTofu versions the engine leaves the variable unset, because they can corrupt a cache that several runs write to at once.
+- If you set `TF_PLUGIN_CACHE_DIR` yourself, the engine keeps your value.
+- To turn the cache off, set `no_auto_provider_cache_dir = true` in the engine `meta`. The attribute has the same name as Terragrunt's `--no-auto-provider-cache-dir` flag.
+
 ## Usage
 
 Add an `engine` block to your Terragrunt configuration:
@@ -44,14 +52,16 @@ engine {
   source  = "github.com/gruntwork-io/terragrunt-engine-opentofu"
 
   meta = {
-    tofu_version     = "v1.9.1"                # Required for auto-install: OpenTofu version to download (you can use "latest" to use the latest stable version)
-    tofu_install_dir = "/custom/install/path"  # Optional: Custom installation directory
+    tofu_version               = "v1.9.1"                # Required for auto-install: OpenTofu version to download (you can use "latest" to use the latest stable version)
+    tofu_install_dir           = "/custom/install/path"  # Optional: Custom installation directory
+    no_auto_provider_cache_dir = true                    # Optional: Turn off the shared provider cache
   }
 }
 ```
 
 - `tofu_version` is the OpenTofu version to download, such as `"v1.9.1"` or `"1.8.5"`, or `"latest"` for the latest stable release. Without it, the engine uses the `tofu` binary on your `PATH`.
 - `tofu_install_dir` is where the engine puts the binary. The default is `~/.cache/terragrunt/tofudl/bin/<version>/`.
+- `no_auto_provider_cache_dir` turns off the [shared provider cache](#shared-provider-cache) when `true`. The default is `false`.
 
 Examples:
 

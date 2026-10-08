@@ -2,6 +2,7 @@ package engine_test
 
 import (
 	"context"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -14,6 +15,8 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/metadata"
+	"google.golang.org/protobuf/types/known/anypb"
+	"google.golang.org/protobuf/types/known/structpb"
 )
 
 // MockInitServer is a mock implementation of the InitServer interface
@@ -121,7 +124,7 @@ func (m *MockShutdownServer) RecvMsg(msg any) error {
 func TestTofuEngine_Init(t *testing.T) {
 	t.Parallel()
 
-	engine := &engine.TofuEngine{}
+	engine := &engine.TofuEngine{PluginCacheDir: t.TempDir()}
 	mockStream := &MockInitServer{}
 
 	err := engine.Init(&tgengine.InitRequest{}, mockStream)
@@ -131,6 +134,24 @@ func TestTofuEngine_Init(t *testing.T) {
 	assert.Equal(t, "Tofu Initialization started", mockStream.Responses[0].GetLog().GetContent())
 	assert.NotNil(t, mockStream.Responses[1].GetLog())
 	assert.Equal(t, "Tofu Initialization completed", mockStream.Responses[1].GetLog().GetContent())
+}
+
+func TestTofuEngine_InitRejectsNonBooleanNoAutoProviderCacheDir(t *testing.T) {
+	t.Parallel()
+
+	value, err := anypb.New(structpb.NewStringValue(`"sometimes"`))
+	require.NoError(t, err)
+
+	engine := &engine.TofuEngine{PluginCacheDir: t.TempDir()}
+	mockStream := &MockInitServer{}
+
+	err = engine.Init(&tgengine.InitRequest{
+		Meta: map[string]*anypb.Any{"no_auto_provider_cache_dir": value},
+	}, mockStream)
+	require.ErrorIs(t, err, strconv.ErrSyntax)
+
+	require.Len(t, mockStream.Responses, 3)
+	assert.Equal(t, int32(1), mockStream.Responses[2].GetExitResult().GetCode())
 }
 
 func TestTofuEngine_Run(t *testing.T) {

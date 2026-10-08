@@ -8,6 +8,7 @@ import (
 	"io"
 	"net"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -24,8 +25,11 @@ import (
 )
 
 const (
-	bufSize    = 1024 * 1024
-	versionCmd = "version"
+	bufSize         = 1024 * 1024
+	versionCmd      = "version"
+	tofuVersionMeta = "tofu_version"
+
+	noAutoProviderCacheDirMeta = "no_auto_provider_cache_dir"
 )
 
 // createStringAny encodes a meta value the way Terragrunt sends it: a JSON-encoded string
@@ -48,7 +52,7 @@ func TestRun(t *testing.T) {
 	t.Parallel()
 	ctx := t.Context()
 
-	stdout, stderr, err := runTofuCommand(t, ctx, "tofu", []string{"init"}, "fixture-basic-project", map[string]string{})
+	stdout, stderr, err := runTofuCommand(t, ctx, &engine.TofuEngine{PluginCacheDir: t.TempDir()}, "tofu", []string{"init"}, "fixture-basic-project", map[string]string{})
 	require.NoError(t, err)
 
 	require.NotEmpty(t, stdout)
@@ -60,11 +64,11 @@ func TestVarPassing(t *testing.T) {
 	t.Parallel()
 	ctx := t.Context()
 
-	_, _, err := runTofuCommand(t, ctx, "tofu", []string{"init"}, "fixture-variables", map[string]string{})
+	_, _, err := runTofuCommand(t, ctx, &engine.TofuEngine{PluginCacheDir: t.TempDir()}, "tofu", []string{"init"}, "fixture-variables", map[string]string{})
 	require.NoError(t, err)
 
 	testValue := fmt.Sprintf("test_value_%v", time.Now().Unix())
-	stdout, stderr, err := runTofuCommand(t, ctx, "tofu", []string{"plan"}, "fixture-variables", map[string]string{"TF_VAR_test_var": testValue})
+	stdout, stderr, err := runTofuCommand(t, ctx, &engine.TofuEngine{PluginCacheDir: t.TempDir()}, "tofu", []string{"plan"}, "fixture-variables", map[string]string{"TF_VAR_test_var": testValue})
 	require.NoError(t, err)
 
 	require.NotEmpty(t, stdout)
@@ -82,10 +86,10 @@ func TestAutoInstallExplicitVersion(t *testing.T) {
 	require.NoError(t, err)
 
 	meta := map[string]*anypb.Any{
-		"tofu_version": versionAny,
+		tofuVersionMeta: versionAny,
 	}
 
-	stdout, stderr, err := runTofuCommandWithInit(t, ctx, "tofu", []string{versionCmd}, "fixture-basic-project", map[string]string{}, meta)
+	stdout, stderr, err := runTofuCommandWithInit(t, ctx, &engine.TofuEngine{PluginCacheDir: t.TempDir()}, "tofu", []string{versionCmd}, "fixture-basic-project", map[string]string{}, meta)
 	require.NoError(t, err)
 
 	require.NotEmpty(t, stdout)
@@ -103,10 +107,10 @@ func TestAutoInstallInvalidVersion(t *testing.T) {
 	require.NoError(t, err)
 
 	meta := map[string]*anypb.Any{
-		"tofu_version": versionAny,
+		tofuVersionMeta: versionAny,
 	}
 
-	_, _, err = runTofuCommandWithInit(t, ctx, "tofu", []string{versionCmd}, "fixture-basic-project", map[string]string{}, meta)
+	_, _, err = runTofuCommandWithInit(t, ctx, &engine.TofuEngine{PluginCacheDir: t.TempDir()}, "tofu", []string{versionCmd}, "fixture-basic-project", map[string]string{}, meta)
 	require.ErrorIs(t, err, ErrFailedToInitialize)
 
 	assert.Contains(t, err.Error(), "failed to download OpenTofu: No such version: 0.0.0")
@@ -121,10 +125,10 @@ func TestAutoInstallLatestVersion(t *testing.T) {
 	require.NoError(t, err)
 
 	meta := map[string]*anypb.Any{
-		"tofu_version": versionAny,
+		tofuVersionMeta: versionAny,
 	}
 
-	stdout, stderr, err := runTofuCommandWithInit(t, ctx, "tofu", []string{versionCmd}, "fixture-basic-project", map[string]string{}, meta)
+	stdout, stderr, err := runTofuCommandWithInit(t, ctx, &engine.TofuEngine{PluginCacheDir: t.TempDir()}, "tofu", []string{versionCmd}, "fixture-basic-project", map[string]string{}, meta)
 	require.NoError(t, err)
 
 	require.NotEmpty(t, stdout)
@@ -140,7 +144,7 @@ func TestNoAutoInstallWithoutVersion(t *testing.T) {
 	// Test without specifying version (should use system binary)
 	meta := map[string]*anypb.Any{}
 
-	stdout, _, err := runTofuCommandWithInit(t, ctx, "tofu", []string{versionCmd}, "fixture-basic-project", map[string]string{}, meta)
+	stdout, _, err := runTofuCommandWithInit(t, ctx, &engine.TofuEngine{PluginCacheDir: t.TempDir()}, "tofu", []string{versionCmd}, "fixture-basic-project", map[string]string{}, meta)
 
 	// This test might fail if system doesn't have tofu installed, which is expected behavior
 	if err != nil {
@@ -169,11 +173,11 @@ func TestAutoInstallWithCustomInstallDir(t *testing.T) {
 	require.NoError(t, err)
 
 	meta := map[string]*anypb.Any{
-		"tofu_version":     versionAny,
+		tofuVersionMeta:    versionAny,
 		"tofu_install_dir": installDirAny,
 	}
 
-	stdout, stderr, err := runTofuCommandWithInit(t, ctx, "tofu", []string{versionCmd}, "fixture-basic-project", map[string]string{}, meta)
+	stdout, stderr, err := runTofuCommandWithInit(t, ctx, &engine.TofuEngine{PluginCacheDir: t.TempDir()}, "tofu", []string{versionCmd}, "fixture-basic-project", map[string]string{}, meta)
 	require.NoError(t, err)
 
 	require.NotEmpty(t, stdout)
@@ -187,14 +191,97 @@ func TestAutoInstallWithCustomInstallDir(t *testing.T) {
 	}()
 }
 
+func TestPluginCacheSharing(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		envVars     map[string]string
+		meta        map[string]string
+		name        string
+		tofuVersion string
+		wantCached  bool
+	}{
+		{
+			name:        "tofu 1.10 or newer shares the cache",
+			tofuVersion: "v1.11.2",
+			envVars:     map[string]string{},
+			wantCached:  true,
+		},
+		{
+			name:        "tofu older than 1.10 does not share the cache",
+			tofuVersion: "v1.9.1",
+			envVars:     map[string]string{},
+			wantCached:  false,
+		},
+		{
+			name:        "request that names the variable keeps its value",
+			tofuVersion: "v1.11.2",
+			envVars:     map[string]string{"TF_PLUGIN_CACHE_DIR": ""},
+			wantCached:  false,
+		},
+		{
+			name:        "true no_auto_provider_cache_dir meta does not share the cache",
+			tofuVersion: "v1.11.2",
+			envVars:     map[string]string{},
+			meta:        map[string]string{noAutoProviderCacheDirMeta: "true"},
+			wantCached:  false,
+		},
+		{
+			name:        "false no_auto_provider_cache_dir meta shares the cache",
+			tofuVersion: "v1.11.2",
+			envVars:     map[string]string{},
+			meta:        map[string]string{noAutoProviderCacheDirMeta: "false"},
+			wantCached:  true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			versionAny, err := createStringAny(tc.tofuVersion)
+			require.NoError(t, err)
+
+			config, err := os.ReadFile(filepath.Join("fixture-basic-project", "main.tf"))
+			require.NoError(t, err)
+
+			workingDir := t.TempDir()
+			require.NoError(t, os.WriteFile(filepath.Join(workingDir, "main.tf"), config, 0600))
+
+			pluginCacheDir := t.TempDir()
+			meta := map[string]*anypb.Any{tofuVersionMeta: versionAny}
+
+			for key, value := range tc.meta {
+				valueAny, err := createStringAny(value)
+				require.NoError(t, err)
+
+				meta[key] = valueAny
+			}
+
+			_, _, err = runTofuCommandWithInit(t, t.Context(), &engine.TofuEngine{PluginCacheDir: pluginCacheDir}, "tofu", []string{"init"}, workingDir, tc.envVars, meta)
+			require.NoError(t, err)
+
+			cached, err := os.ReadDir(pluginCacheDir)
+			require.NoError(t, err)
+
+			if tc.wantCached {
+				assert.NotEmpty(t, cached)
+				return
+			}
+
+			assert.Empty(t, cached)
+		})
+	}
+}
+
 // newEngineClient starts an engine server for a single command, so engine state such as
 // the OpenTofu binary path set by Init does not leak between parallel tests.
-func newEngineClient(t *testing.T) tgengine.EngineClient {
+func newEngineClient(t *testing.T, eng *engine.TofuEngine) tgengine.EngineClient {
 	t.Helper()
 
 	lis := bufconn.Listen(bufSize)
 	server := grpc.NewServer()
-	tgengine.RegisterEngineServer(server, &engine.TofuEngine{})
+	tgengine.RegisterEngineServer(server, eng)
 
 	go func() {
 		if err := server.Serve(lis); err != nil {
@@ -217,10 +304,10 @@ func newEngineClient(t *testing.T) tgengine.EngineClient {
 	return tgengine.NewEngineClient(conn)
 }
 
-func runTofuCommand(t *testing.T, ctx context.Context, command string, args []string, workingDir string, envVars map[string]string) (string, string, error) {
+func runTofuCommand(t *testing.T, ctx context.Context, eng *engine.TofuEngine, command string, args []string, workingDir string, envVars map[string]string) (string, string, error) {
 	t.Helper()
 
-	client := newEngineClient(t)
+	client := newEngineClient(t, eng)
 
 	stream, err := client.Run(ctx, &tgengine.RunRequest{
 		Command:    command,
@@ -271,10 +358,10 @@ func runTofuCommand(t *testing.T, ctx context.Context, command string, args []st
 
 var ErrFailedToInitialize = errors.New("failed to initialize")
 
-func runTofuCommandWithInit(t *testing.T, ctx context.Context, command string, args []string, workingDir string, envVars map[string]string, meta map[string]*anypb.Any) (string, string, error) {
+func runTofuCommandWithInit(t *testing.T, ctx context.Context, eng *engine.TofuEngine, command string, args []string, workingDir string, envVars map[string]string, meta map[string]*anypb.Any) (string, string, error) {
 	t.Helper()
 
-	client := newEngineClient(t)
+	client := newEngineClient(t, eng)
 
 	// First call Init with the specified metadata
 	initStream, err := client.Init(ctx, &tgengine.InitRequest{
