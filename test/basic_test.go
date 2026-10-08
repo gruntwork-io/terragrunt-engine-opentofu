@@ -30,6 +30,8 @@ const (
 	tofuVersionMeta = "tofu_version"
 
 	noAutoProviderCacheDirMeta = "no_auto_provider_cache_dir"
+
+	sharedCacheTofuVersion = "v1.11.2"
 )
 
 // createStringAny encodes a meta value the way Terragrunt sends it: a JSON-encoded string
@@ -264,15 +266,16 @@ func TestPluginCacheSharing(t *testing.T) {
 	t.Parallel()
 
 	testCases := []struct {
-		envVars     map[string]string
-		meta        map[string]string
-		name        string
-		tofuVersion string
-		wantCached  bool
+		envVars          map[string]string
+		meta             map[string]string
+		name             string
+		tofuVersion      string
+		customInstallDir bool
+		wantCached       bool
 	}{
 		{
 			name:        "tofu 1.10 or newer shares the cache",
-			tofuVersion: "v1.11.2",
+			tofuVersion: sharedCacheTofuVersion,
 			envVars:     map[string]string{},
 			wantCached:  true,
 		},
@@ -283,21 +286,41 @@ func TestPluginCacheSharing(t *testing.T) {
 			wantCached:  false,
 		},
 		{
+			name:             "tofu 1.10 or newer in a custom install directory shares the cache",
+			tofuVersion:      sharedCacheTofuVersion,
+			envVars:          map[string]string{},
+			customInstallDir: true,
+			wantCached:       true,
+		},
+		{
+			name:             "tofu older than 1.10 in a custom install directory does not share the cache",
+			tofuVersion:      "v1.9.1",
+			envVars:          map[string]string{},
+			customInstallDir: true,
+			wantCached:       false,
+		},
+		{
+			name:        "latest tofu shares the cache",
+			tofuVersion: "latest",
+			envVars:     map[string]string{},
+			wantCached:  true,
+		},
+		{
 			name:        "request that names the variable keeps its value",
-			tofuVersion: "v1.11.2",
+			tofuVersion: sharedCacheTofuVersion,
 			envVars:     map[string]string{"TF_PLUGIN_CACHE_DIR": ""},
 			wantCached:  false,
 		},
 		{
 			name:        "true no_auto_provider_cache_dir meta does not share the cache",
-			tofuVersion: "v1.11.2",
+			tofuVersion: sharedCacheTofuVersion,
 			envVars:     map[string]string{},
 			meta:        map[string]string{noAutoProviderCacheDirMeta: "true"},
 			wantCached:  false,
 		},
 		{
 			name:        "false no_auto_provider_cache_dir meta shares the cache",
-			tofuVersion: "v1.11.2",
+			tofuVersion: sharedCacheTofuVersion,
 			envVars:     map[string]string{},
 			meta:        map[string]string{noAutoProviderCacheDirMeta: "false"},
 			wantCached:  true,
@@ -319,6 +342,13 @@ func TestPluginCacheSharing(t *testing.T) {
 
 			pluginCacheDir := t.TempDir()
 			meta := map[string]*anypb.Any{tofuVersionMeta: versionAny}
+
+			if tc.customInstallDir {
+				installDirAny, err := createStringAny(t.TempDir())
+				require.NoError(t, err)
+
+				meta["tofu_install_dir"] = installDirAny
+			}
 
 			for key, value := range tc.meta {
 				valueAny, err := createStringAny(value)

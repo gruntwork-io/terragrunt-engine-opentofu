@@ -34,6 +34,7 @@ import (
 const (
 	wgSize          = 2
 	iacCommand      = "tofu"
+	latestVersion   = "latest"
 	errorResultCode = 1
 	installDirMode  = 0755
 
@@ -151,7 +152,7 @@ func (c *TofuEngine) Init(req *tgengine.InitRequest, stream tgengine.Engine_Init
 	pluginCacheDir := ""
 
 	if !noAutoProviderCacheDir {
-		pluginCacheDir, err = c.sharedPluginCacheDir(stream.Context())
+		pluginCacheDir, err = c.sharedPluginCacheDir(stream.Context(), version)
 		if err != nil {
 			log.Debugf("Runs do not share a plugin cache: %v", err)
 		}
@@ -241,8 +242,11 @@ func metaString(value *anypb.Any) string {
 // sharedPluginCacheDir returns the plugin cache directory for the binary Init picked, creating it if needed.
 //
 // Returns [ErrPluginCacheUnsupported] when the binary is older than OpenTofu 1.10.
-func (c *TofuEngine) sharedPluginCacheDir(ctx context.Context) (string, error) {
-	major, minor, err := tofuVersion(ctx, c.getBinaryPath())
+func (c *TofuEngine) sharedPluginCacheDir(
+	ctx context.Context,
+	requestedVersion string,
+) (string, error) {
+	major, minor, err := c.binaryVersion(ctx, requestedVersion)
 	if err != nil {
 		return "", err
 	}
@@ -270,6 +274,30 @@ func (c *TofuEngine) sharedPluginCacheDir(ctx context.Context) (string, error) {
 	return dir, nil
 }
 
+// binaryVersion returns the major and minor version of the binary Init picked.
+//
+// It reads them from requestedVersion when the binary sits in the default install directory
+// for that version, and asks the binary otherwise.
+func (c *TofuEngine) binaryVersion(
+	ctx context.Context,
+	requestedVersion string,
+) (major, minor int, err error) {
+	binaryPath := c.getBinaryPath()
+
+	if requestedVersion == "" || requestedVersion == latestVersion {
+		return tofuVersion(ctx, binaryPath)
+	}
+
+	// Any other directory can already have a binary of another version, which the
+	// download step reuses as it is.
+	defaultBinDir, err := getDefaultBinDir(requestedVersion)
+	if err != nil || filepath.Dir(binaryPath) != defaultBinDir {
+		return tofuVersion(ctx, binaryPath)
+	}
+
+	return parseMajorMinor(normalizeVersion(requestedVersion))
+}
+
 // tofuVersion returns the major and minor version that the binary at binaryPath reports.
 func tofuVersion(ctx context.Context, binaryPath string) (major, minor int, err error) {
 	ctx, cancel := context.WithTimeout(ctx, versionProbeTimeout)
@@ -292,13 +320,13 @@ func tofuVersion(ctx context.Context, binaryPath string) (major, minor int, err 
 		return 0, 0, fmt.Errorf("failed to parse %s version output: %w", iacCommand, err)
 	}
 
-	if _, err := fmt.Sscanf(output.Version, "%d.%d", &major, &minor); err != nil {
-		return 0, 0, fmt.Errorf(
-			"failed to parse %s version %q: %w",
-			iacCommand,
-			output.Version,
-			err,
-		)
+	return parseMajorMinor(output.Version)
+}
+
+// parseMajorMinor returns the major and minor numbers of a version such as 1.10.3.
+func parseMajorMinor(version string) (major, minor int, err error) {
+	if _, err := fmt.Sscanf(version, "%d.%d", &major, &minor); err != nil {
+		return 0, 0, fmt.Errorf("failed to parse %s version %q: %w", iacCommand, version, err)
 	}
 
 	return major, minor, nil
@@ -413,6 +441,7 @@ func (c *TofuEngine) downloadOpenTofu(version, installDir string) (string, error
 				"Failed to acquire blocking download lock, continuing without locking: %v",
 				err,
 			)
+
 			return c.downloadOpenTofuUnsafe(version, installDir)
 		}
 	}
@@ -468,7 +497,7 @@ func (c *TofuEngine) downloadOpenTofuUnsafe(version, installDir string) (string,
 	var opts []tofudl.DownloadOpt
 
 	// Handle "latest" version using stability option, otherwise use specific version
-	if version == "latest" {
+	if version == latestVersion {
 		opts = append(opts, tofudl.DownloadOptMinimumStability(tofudl.StabilityStable))
 
 		log.Debug("Downloading latest stable OpenTofu version")
