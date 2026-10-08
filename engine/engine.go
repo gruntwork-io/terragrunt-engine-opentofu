@@ -51,7 +51,9 @@ const (
 )
 
 // ErrPluginCacheUnsupported reports an OpenTofu version that cannot share a plugin cache between concurrent runs.
-var ErrPluginCacheUnsupported = errors.New("OpenTofu older than 1.10 cannot share a plugin cache between concurrent runs")
+var ErrPluginCacheUnsupported = errors.New(
+	"OpenTofu older than 1.10 cannot share a plugin cache between concurrent runs",
+)
 
 // TofuEngine runs OpenTofu on the machine Terragrunt runs on.
 type TofuEngine struct {
@@ -245,7 +247,8 @@ func (c *TofuEngine) sharedPluginCacheDir(ctx context.Context) (string, error) {
 		return "", err
 	}
 
-	if major < pluginCacheMinMajor || (major == pluginCacheMinMajor && minor < pluginCacheMinMinor) {
+	if major < pluginCacheMinMajor ||
+		(major == pluginCacheMinMajor && minor < pluginCacheMinMinor) {
 		return "", fmt.Errorf("%w: found %d.%d", ErrPluginCacheUnsupported, major, minor)
 	}
 
@@ -290,7 +293,12 @@ func tofuVersion(ctx context.Context, binaryPath string) (major, minor int, err 
 	}
 
 	if _, err := fmt.Sscanf(output.Version, "%d.%d", &major, &minor); err != nil {
-		return 0, 0, fmt.Errorf("failed to parse %s version %q: %w", iacCommand, output.Version, err)
+		return 0, 0, fmt.Errorf(
+			"failed to parse %s version %q: %w",
+			iacCommand,
+			output.Version,
+			err,
+		)
 	}
 
 	return major, minor, nil
@@ -401,7 +409,10 @@ func (c *TofuEngine) downloadOpenTofu(version, installDir string) (string, error
 
 		err = fileLock.Lock()
 		if err != nil {
-			log.Warnf("Failed to acquire blocking download lock, continuing without locking: %v", err)
+			log.Warnf(
+				"Failed to acquire blocking download lock, continuing without locking: %v",
+				err,
+			)
 			return c.downloadOpenTofuUnsafe(version, installDir)
 		}
 	}
@@ -698,7 +709,10 @@ func sendError(stream tgengine.Engine_RunServer, err error) {
 	}
 }
 
-func (c *TofuEngine) Shutdown(req *tgengine.ShutdownRequest, stream tgengine.Engine_ShutdownServer) error {
+func (c *TofuEngine) Shutdown(
+	req *tgengine.ShutdownRequest,
+	stream tgengine.Engine_ShutdownServer,
+) error {
 	log.Debug("Shutdown Tofu plugin")
 
 	if err := stream.Send(&tgengine.ShutdownResponse{
@@ -730,6 +744,10 @@ func (c *TofuEngine) GRPCServer(broker *plugin.GRPCBroker, s *grpc.Server) error
 }
 
 // GRPCClient is used to create a client that connects to the TofuEngine
-func (c *TofuEngine) GRPCClient(ctx context.Context, broker *plugin.GRPCBroker, client *grpc.ClientConn) (any, error) {
+func (c *TofuEngine) GRPCClient(
+	ctx context.Context,
+	broker *plugin.GRPCBroker,
+	client *grpc.ClientConn,
+) (any, error) {
 	return tgengine.NewEngineClient(client), nil
 }
