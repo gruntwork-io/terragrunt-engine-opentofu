@@ -4,12 +4,12 @@ go 1.27
 
 require (
 	github.com/creack/pty v1.1.24
-	github.com/gofrs/flock v0.13.0
+	github.com/gofrs/flock v0.13.1
 	github.com/gruntwork-io/terragrunt-engine-go v0.2.0
 	github.com/hashicorp/go-hclog v1.6.3
 	github.com/hashicorp/go-plugin v1.8.0
 	github.com/opentofu/tofudl v0.0.1
-	github.com/sirupsen/logrus v1.9.4
+	github.com/sirupsen/logrus v1.10.2
 	github.com/stretchr/testify v1.12.1
 	golang.org/x/text v0.42.0
 	google.golang.org/grpc v1.84.0
