@@ -15,7 +15,7 @@ jobs:
           persist-credentials: false
 
       - name: Use mise to install dependencies
-        uses: jdx/mise-action@dad1bfd3df957f44999b559dd69dc1671cb4e9ea # v4.2.1
+        uses: jdx/mise-action@2d8d4cafcbd33be2ea37d2b6f5ad595363d1f1ca # v5.1.1
         with:
           version: 2025.12.13
           experimental: true
